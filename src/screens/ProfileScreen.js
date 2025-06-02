@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Image,
   Switch,
   ScrollView,
@@ -12,19 +11,32 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
+
+// Importar contexto do usuário
+import { useUser } from '../contexts/UserContext';
 
 // Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
 
-// Chave para armazenar o token do usuário e informações
-const USER_TOKEN_KEY = 'user_token';
-const USER_INFO_KEY = 'user_info';
+// Chaves para armazenamento
 const SETTINGS_STORAGE_KEY = 'app_settings';
+const FAVORITES_STORAGE_KEY = 'apod_favorites';
 
-const ProfileScreen = ({ navigation, route }) => {
-  const [userInfo, setUserInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
+const ProfileScreen = () => {
+  const { 
+    userInfo, 
+    logout, 
+    getDisplayName, 
+    getDisplayEmail, 
+    getProfilePicture 
+  } = useUser();
+  
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    visualizations: 0,
+    favorites: 0,
+    shares: 0,
+  });
   const [settings, setSettings] = useState({
     darkMode: true,
     notifications: true,
@@ -32,47 +44,53 @@ const ProfileScreen = ({ navigation, route }) => {
     autoPlay: false,
   });
 
-  // Carregar informações do usuário e configurações ao iniciar o componente
+  // Carregar estatísticas e configurações ao iniciar o componente
   useEffect(() => {
-    const loadUserInfo = async () => {
-      try {
-        setLoading(true);
-        
-        // Tentar obter do parâmetro de rota, se disponível
-        let user = route.params?.user;
-        
-        // Se não tiver na rota, tentar buscar do armazenamento
-        if (!user) {
-          const storedUserInfo = await SecureStore.getItemAsync(USER_INFO_KEY);
-          if (storedUserInfo) {
-            user = JSON.parse(storedUserInfo);
-          }
-        } else {
-          // Se receber da rota, salvar no SecureStore
-          await SecureStore.setItemAsync(USER_INFO_KEY, JSON.stringify(user));
-        }
-        
-        setUserInfo(user);
-        
-        // Carregar configurações
-        const storedSettings = await SecureStore.getItemAsync(SETTINGS_STORAGE_KEY);
-        if (storedSettings) {
-          setSettings(JSON.parse(storedSettings));
-        }
-      } catch (error) {
-        console.error('Erro ao carregar informações do perfil:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    loadStats();
+    loadSettings();
+  }, []);
 
-    loadUserInfo();
-  }, [route.params]);
+  const loadStats = async () => {
+    try {
+      // Carregar estatísticas dos favoritos
+      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      const favoritesCount = storedFavorites ? JSON.parse(storedFavorites).length : 0;
+      
+      // Carregar outras estatísticas (simuladas por enquanto)
+      const storedStats = localStorage.getItem('user_stats');
+      if (storedStats) {
+        const parsedStats = JSON.parse(storedStats);
+        setStats({
+          ...parsedStats,
+          favorites: favoritesCount,
+        });
+      } else {
+        setStats({
+          visualizations: Math.floor(Math.random() * 50) + 10,
+          favorites: favoritesCount,
+          shares: Math.floor(Math.random() * 20) + 1,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (storedSettings) {
+        setSettings(JSON.parse(storedSettings));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+    }
+  };
 
   // Salvar configurações no armazenamento
   const saveSettings = async (newSettings) => {
     try {
-      await SecureStore.setItemAsync(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
     }
@@ -85,38 +103,31 @@ const ProfileScreen = ({ navigation, route }) => {
     saveSettings(newSettings);
   };
 
-  // Realizar logout
+  // Realizar logout usando confirm nativo (mais compatível com web)
   const handleLogout = () => {
-    Alert.alert(
-      'Sair',
-      'Tem certeza que deseja sair da sua conta?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Sair',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Remover token e informações do usuário
-              await SecureStore.deleteItemAsync(USER_TOKEN_KEY);
-              await SecureStore.deleteItemAsync(USER_INFO_KEY);
-              
-              // Redirecionar para a tela de login
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              });
-            } catch (error) {
-              console.error('Erro ao fazer logout:', error);
-              Alert.alert('Erro', 'Não foi possível realizar o logout. Tente novamente.');
-            }
-          },
-        },
-      ]
-    );
+    // Usar confirm nativo do browser em vez de Alert do React Native
+    const confirmed = window.confirm('Tem certeza que deseja sair da sua conta?');
+    
+    if (confirmed) {
+      performLogout();
+    }
+  };
+
+  // Função para executar o logout
+  const performLogout = async () => {
+    try {
+      setLoading(true);
+      
+      // Usar o logout do contexto
+      await logout();
+      
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      // Usar alert nativo do browser
+      window.alert('Erro: Não foi possível realizar o logout. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -126,9 +137,9 @@ const ProfileScreen = ({ navigation, route }) => {
         {/* Cabeçalho do perfil */}
         <View style={styles.profileHeader}>
           <View style={styles.profileInfo}>
-            {userInfo?.picture ? (
+            {getProfilePicture() ? (
               <Image 
-                source={{ uri: userInfo.picture }} 
+                source={{ uri: getProfilePicture() }} 
                 style={styles.profileImage}
               />
             ) : (
@@ -138,14 +149,14 @@ const ProfileScreen = ({ navigation, route }) => {
             )}
             
             <View style={styles.profileText}>
-              <Text style={styles.profileName}>{userInfo?.name || 'Usuário'}</Text>
-              <Text style={styles.profileEmail}>{userInfo?.email || 'email@exemplo.com'}</Text>
+              <Text style={styles.profileName}>{getDisplayName()}</Text>
+              <Text style={styles.profileEmail}>{getDisplayEmail()}</Text>
             </View>
           </View>
           
           <TouchableOpacity 
             style={styles.editButton}
-            onPress={() => Alert.alert('Informação', 'Edição de perfil não disponível nesta versão.')}
+            onPress={() => window.alert('Edição de perfil não disponível nesta versão.')}
           >
             <Ionicons name="pencil-outline" size={20} color={COLORS.text} />
           </TouchableOpacity>
@@ -154,15 +165,15 @@ const ProfileScreen = ({ navigation, route }) => {
         {/* Estatísticas */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>32</Text>
+            <Text style={styles.statValue}>{stats.visualizations}</Text>
             <Text style={styles.statLabel}>Visualizações</Text>
           </View>
           <View style={[styles.statItem, styles.statBorder]}>
-            <Text style={styles.statValue}>16</Text>
+            <Text style={styles.statValue}>{stats.favorites}</Text>
             <Text style={styles.statLabel}>Favoritos</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>8</Text>
+            <Text style={styles.statValue}>{stats.shares}</Text>
             <Text style={styles.statLabel}>Compartilhamentos</Text>
           </View>
         </View>
@@ -237,7 +248,7 @@ const ProfileScreen = ({ navigation, route }) => {
           <View style={styles.aboutContainer}>
             <TouchableOpacity 
               style={styles.aboutItem}
-              onPress={() => Alert.alert('Versão', 'APOD Explorer v1.0.0')}
+              onPress={() => window.alert('APOD Explorer v1.0.0')}
             >
               <Ionicons name="information-circle-outline" size={22} color={COLORS.text} style={styles.aboutIcon} />
               <Text style={styles.aboutText}>Versão 1.0.0</Text>
@@ -245,7 +256,7 @@ const ProfileScreen = ({ navigation, route }) => {
             
             <TouchableOpacity 
               style={styles.aboutItem}
-              onPress={() => Alert.alert('Sobre a API', 'Este aplicativo utiliza a API APOD (Astronomy Picture of the Day) da NASA.')}
+              onPress={() => window.alert('Este aplicativo utiliza a API APOD (Astronomy Picture of the Day) da NASA.')}
             >
               <Ionicons name="globe-outline" size={22} color={COLORS.text} style={styles.aboutIcon} />
               <Text style={styles.aboutText}>Sobre a API APOD</Text>
@@ -253,7 +264,7 @@ const ProfileScreen = ({ navigation, route }) => {
             
             <TouchableOpacity 
               style={styles.aboutItem}
-              onPress={() => Alert.alert('Termos de Uso', 'Os termos de uso deste aplicativo seguem as diretrizes da NASA para uso de suas APIs.')}
+              onPress={() => window.alert('Os termos de uso deste aplicativo seguem as diretrizes da NASA para uso de suas APIs.')}
             >
               <Ionicons name="document-text-outline" size={22} color={COLORS.text} style={styles.aboutIcon} />
               <Text style={styles.aboutText}>Termos de Uso</Text>
@@ -261,7 +272,7 @@ const ProfileScreen = ({ navigation, route }) => {
             
             <TouchableOpacity 
               style={styles.aboutItem}
-              onPress={() => Alert.alert('Política de Privacidade', 'Respeitamos sua privacidade. Nenhum dado pessoal é compartilhado com terceiros.')}
+              onPress={() => window.alert('Respeitamos sua privacidade. Nenhum dado pessoal é compartilhado com terceiros.')}
             >
               <Ionicons name="shield-checkmark-outline" size={22} color={COLORS.text} style={styles.aboutIcon} />
               <Text style={styles.aboutText}>Política de Privacidade</Text>
@@ -273,9 +284,12 @@ const ProfileScreen = ({ navigation, route }) => {
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleLogout}
+          disabled={loading}
         >
           <Ionicons name="log-out-outline" size={22} color={COLORS.notification} />
-          <Text style={styles.logoutText}>Sair da conta</Text>
+          <Text style={styles.logoutText}>
+            {loading ? 'Saindo...' : 'Sair da conta'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

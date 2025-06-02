@@ -1,4 +1,4 @@
-// src/screens/FavoritesScreen.js
+// src/screens/FavoritesScreen.js - Corrigido para web
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,7 +11,6 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect } from '@react-navigation/native';
 
 // Importar componentes
@@ -20,7 +19,7 @@ import APODCard from '../components/APODCard';
 // Importar constantes
 import { COLORS } from '../config/constants';
 
-// Chave para armazenar favoritos no SecureStore
+// Chave para armazenar favoritos
 const FAVORITES_STORAGE_KEY = 'apod_favorites';
 
 const FavoritesScreen = () => {
@@ -34,11 +33,12 @@ const FavoritesScreen = () => {
     }, [])
   );
 
-  // Carregar favoritos do armazenamento
+  // Carregar favoritos do armazenamento - CORRIGIDO PARA WEB
   const loadFavorites = async () => {
     try {
       setLoading(true);
-      const storedFavorites = await SecureStore.getItemAsync(FAVORITES_STORAGE_KEY);
+      // Usar localStorage para web
+      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
       
       if (storedFavorites) {
         setFavorites(JSON.parse(storedFavorites));
@@ -53,10 +53,11 @@ const FavoritesScreen = () => {
     }
   };
 
-  // Salvar favoritos no armazenamento
+  // Salvar favoritos no armazenamento - CORRIGIDO PARA WEB
   const saveFavorites = async (newFavorites) => {
     try {
-      await SecureStore.setItemAsync(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
+      // Usar localStorage para web
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
     } catch (err) {
       console.error('Erro ao salvar favoritos:', err);
     }
@@ -102,7 +103,8 @@ const FavoritesScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await SecureStore.deleteItemAsync(FAVORITES_STORAGE_KEY);
+              // CORRIGIDO PARA WEB - usar localStorage
+              localStorage.removeItem(FAVORITES_STORAGE_KEY);
               setFavorites([]);
             } catch (err) {
               console.error('Erro ao limpar favoritos:', err);

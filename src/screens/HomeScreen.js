@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.js
+// src/screens/HomeScreen.js - Corrigido para web
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import * as SecureStore from 'expo-secure-store';
 
 // Importar componentes
 import APODCard from '../components/APODCard';
@@ -24,7 +23,7 @@ import { getAPOD, getRandomAPODs } from '../services/api';
 // Importar constantes
 import { COLORS } from '../config/constants';
 
-// Chave para armazenar favoritos no SecureStore
+// Chave para armazenamento de favoritos
 const FAVORITES_STORAGE_KEY = 'apod_favorites';
 
 const HomeScreen = () => {
@@ -73,10 +72,11 @@ const HomeScreen = () => {
     }
   };
 
-  // Carregar favoritos do armazenamento
+  // Carregar favoritos do armazenamento - CORRIGIDO PARA WEB
   const loadFavorites = async () => {
     try {
-      const storedFavorites = await SecureStore.getItemAsync(FAVORITES_STORAGE_KEY);
+      // Usar localStorage para web
+      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
       if (storedFavorites) {
         setFavorites(JSON.parse(storedFavorites));
       }
@@ -85,10 +85,11 @@ const HomeScreen = () => {
     }
   };
 
-  // Salvar favoritos no armazenamento
+  // Salvar favoritos no armazenamento - CORRIGIDO PARA WEB
   const saveFavorites = async (newFavorites) => {
     try {
-      await SecureStore.setItemAsync(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
+      // Usar localStorage para web
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
     } catch (err) {
       console.error('Erro ao salvar favoritos:', err);
     }

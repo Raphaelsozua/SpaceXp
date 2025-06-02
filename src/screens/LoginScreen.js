@@ -1,39 +1,48 @@
+// src/screens/LoginScreen.js - Versão limpa e corrigida
 import React, { useState, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  Image, 
-  ImageBackground,
-  Dimensions,
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
   ActivityIndicator,
   StatusBar,
+  SafeAreaView,
+  Dimensions,
   Platform,
-  SafeAreaView
+  ImageBackground,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Importar contexto do usuário
+import { useUser } from '../contexts/UserContext';
+
+// Importar constantes
+import { COLORS, COMMON_STYLES } from '../config/constants';
+
+// Garantir que as sessões de autenticação sejam concluídas corretamente
 WebBrowser.maybeCompleteAuthSession();
 
-const { width, height } = Dimensions.get('window');
+const screenDimensions = Dimensions.get('window');
 
-export default function LoginScreen({ navigation }) {
+const LoginScreen = ({ navigation }) => {
+  const { login } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [animating, setAnimating] = useState(true);
-
-  const [screenDimensions, setScreenDimensions] = useState({
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height,
+  const [dimensions, setDimensions] = useState({
+    width: screenDimensions.width,
+    height: screenDimensions.height,
   });
 
+  // Configurar listener de dimensões da tela para responsividade
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setScreenDimensions({
+      setDimensions({
         width: window.width,
         height: window.height,
       });
@@ -42,6 +51,7 @@ export default function LoginScreen({ navigation }) {
     return () => subscription?.remove();
   }, []);
 
+  // Configurar solicitação de autenticação do Google
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: '22332176985-o1m31q76l9psr0o4gep64msps583lnhj.apps.googleusercontent.com',
     redirectUri: makeRedirectUri({
@@ -49,8 +59,9 @@ export default function LoginScreen({ navigation }) {
     }),
   });
 
+  // Tratar resposta da autenticação
   useEffect(() => {
-    console.log('Resposta', response);
+    console.log('Resposta da autenticação:', response);
 
     if (response?.type === 'success') {
       setLoading(true);
@@ -62,47 +73,52 @@ export default function LoginScreen({ navigation }) {
     }
   }, [response]);
 
-  const handleSobre = () => {
-    navigation.navigate('Sobre'); // Alterado de replace para navigate
-  };
-
-const getUserInfo = async (token) => {
-  if (!token) {
-    setLoading(false);
-    return;
-  }
-
-  try {
-    const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const user = await response.json();
-    console.log('Login bem-sucedido:', user.name);
-
-    // Salvar o token para uso posterior (opcional)
-    try {
-      await SecureStore.setItemAsync(USER_TOKEN_KEY, token);
-    } catch (e) {
-      console.log('Erro ao salvar token:', e);
+  // Obter informações do usuário após autenticação bem-sucedida
+  const getUserInfo = async (token) => {
+    if (!token) {
+      setLoading(false);
+      return;
     }
 
-    // Navegar para a tela Main que contém o TabNavigator
-    navigation.replace('Main', { user });
-  } catch (error) {
-    console.log('Erro ao obter informações do usuário:', error);
-    setError('Erro ao obter informações do usuário.');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
+      if (!response.ok) {
+        throw new Error('Falha ao obter informações do usuário');
+      }
+
+      const user = await response.json();
+      console.log('Login bem-sucedido:', user);
+
+      // Usar o contexto para fazer login
+      await login(token, user);
+      
+      // A navegação será automática através do AppNavigator quando isAuthenticated mudar
+    } catch (error) {
+      console.error('Erro ao obter informações do usuário:', error);
+      setError('Erro ao obter informações do usuário.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoginPress = async () => {
+    setError(null);
+    try {
+      const result = await promptAsync();
+      console.log('Resultado do promptAsync:', result);
+    } catch (e) {
+      setError('Erro ao iniciar autenticação');
+      console.error(e);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       <ImageBackground
-        // Caminho ajustado para as imagens
         source={require('../../public/images/image.jpg')}
         style={styles.backgroundImage}
         resizeMode="cover"
@@ -112,73 +128,73 @@ const getUserInfo = async (token) => {
           style={styles.overlay}
         >
           <View style={styles.logoContainer}>
-            <Text style={styles.title}>SpaceXp</Text>
-            <Text style={styles.subtitle}>Explore o universo com um simples login</Text>
+            <Text style={styles.appTitle}>APOD Explorer</Text>
+            <Text style={styles.subtitle}>
+              Descubra a imagem astronômica do dia da NASA
+            </Text>
           </View>
 
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={async () => {
-              setError(null);
-              try {
-                const result = await promptAsync();
-                console.log('Resultado do promptAsync:', result);
-              } catch (e) {
-                setError('Erro ao iniciar autenticação');
-                console.error(e);
-              }
-            }}
-            disabled={!request || loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#3498db" />
-                <Text style={styles.loadingText}>Conectando...</Text>
+          <View style={styles.contentContainer}>
+            <View style={styles.infoContainer}>
+              <View style={styles.infoItem}>
+                <Ionicons name="planet-outline" size={24} color={COLORS.accent} style={styles.infoIcon} />
+                <Text style={styles.infoText}>Explore imagens astronômicas incríveis</Text>
               </View>
-            ) : (
-              <>
-                <Image
-                  // Caminho ajustado para as imagens
-                  source={require('../../public/images/google.webp')}
-                  style={styles.googleIcon}
-                />
-                <Text style={styles.buttonText}>Entrar com Google</Text>
-              </>
-            )}
-          </TouchableOpacity>
+              <View style={styles.infoItem}>
+                <Ionicons name="calendar-outline" size={24} color={COLORS.accent} style={styles.infoIcon} />
+                <Text style={styles.infoText}>Acesse o arquivo de imagens da NASA</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="heart-outline" size={24} color={COLORS.accent} style={styles.infoIcon} />
+                <Text style={styles.infoText}>Salve suas imagens favoritas</Text>
+              </View>
+            </View>
 
-          <TouchableOpacity 
-            style={styles.aboutButton} 
-            onPress={handleSobre}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.aboutText}>Sobre o SpaceXp</Text>
-          </TouchableOpacity>
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.loginButton, (!request || loading) && styles.buttonDisabled]}
+              onPress={handleLoginPress}
+              disabled={!request || loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.text} />
+              ) : (
+                <View style={styles.buttonContent}>
+                  <Image 
+                    source={require('../../public/images/google.webp')}
+                    style={styles.buttonIcon} 
+                  />
+                  <Text style={styles.loginButtonText}>Continuar com Google</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.disclaimerText}>
+              Este aplicativo utiliza a API APOD da NASA.
+              Ao fazer login, você concorda com os termos e condições.
+            </Text>
+          </View>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              © {new Date().getFullYear()} SpaceXp • Todos os direitos reservados
+              © {new Date().getFullYear()} APOD Explorer • Todos os direitos reservados
             </Text>
           </View>
         </LinearGradient>
       </ImageBackground>
     </SafeAreaView>
   );
-}
-
-// Estilos permanecem os mesmos
+};
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: COLORS.background,
   },
   backgroundImage: {
     flex: 1,
@@ -188,48 +204,49 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    padding: 20,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 60,
+    marginTop: 60,
   },
-  logoInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    overflow: 'hidden',
-  },
-  appLogo: {
-    width: 60,
-    height: 60,
-    resizeMode: 'contain',
-  },
-  title: {
-    fontSize: 42,
+  appTitle: {
+    fontSize: 36,
     fontWeight: 'bold',
+    color: COLORS.text,
     marginBottom: 10,
-    color: '#fff',
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 5,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
   },
   subtitle: {
-    fontSize: 18,
-    color: '#eee',
+    fontSize: 16,
+    color: COLORS.text,
     textAlign: 'center',
     marginBottom: 20,
     maxWidth: '80%',
-    lineHeight: 24,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+  },
+  contentContainer: {
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: 40,
+  },
+  infoContainer: {
+    marginBottom: 40,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  infoIcon: {
+    marginRight: 12,
+  },
+  infoText: {
+    fontSize: 16,
+    color: COLORS.text,
+    flex: 1,
   },
   errorContainer: {
     backgroundColor: 'rgba(231, 76, 60, 0.8)',
@@ -237,75 +254,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
     marginBottom: 20,
-    width: '90%',
-    maxWidth: 400,
+    width: '100%',
   },
   errorText: {
     color: '#fff',
     textAlign: 'center',
     fontSize: 16,
   },
-  googleButton: {
-    flexDirection: 'row',
+  loginButton: {
+    backgroundColor: COLORS.accent,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 30,
-    paddingVertical: 14,
-    paddingHorizontal: 25,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    width: '85%',
-    maxWidth: 350,
-    marginBottom: 20,
-    borderWidth: 0,
+    marginBottom: 16,
+    ...COMMON_STYLES.shadow,
   },
-  loadingContainer: {
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    marginLeft: 10,
+  buttonIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 10,
+  },
+  loginButtonText: {
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
-    color: '#3498db',
   },
-  buttonText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 15,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
-  },
-  googleIcon: {
-    width: 28,
-    height: 28,
-    resizeMode: 'contain',
-  },
-  aboutButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginTop: 10,
-  },
-  aboutText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textDecorationLine: 'underline',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+  disclaimerText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
   footer: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 40 : 30,
     width: '100%',
     alignItems: 'center',
+    marginBottom: 20,
   },
   footerText: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
-  }
+  },
 });
+
+export default LoginScreen;

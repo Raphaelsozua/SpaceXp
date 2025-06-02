@@ -1,4 +1,4 @@
-// src/screens/DetailScreen.js
+// src/screens/DetailScreen.js - Completo e corrigido para web
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,12 +15,11 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 
 // Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
 
-// Chave para armazenar favoritos no SecureStore
+// Chave para armazenar favoritos
 const FAVORITES_STORAGE_KEY = 'apod_favorites';
 
 const DetailScreen = ({ route, navigation }) => {
@@ -34,10 +33,11 @@ const DetailScreen = ({ route, navigation }) => {
     loadFavorites();
   }, []);
 
-  // Carregar favoritos do armazenamento
+  // Carregar favoritos do armazenamento - CORRIGIDO PARA WEB
   const loadFavorites = async () => {
     try {
-      const storedFavorites = await SecureStore.getItemAsync(FAVORITES_STORAGE_KEY);
+      // Usar localStorage para web
+      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
       if (storedFavorites) {
         const favoritesData = JSON.parse(storedFavorites);
         setFavorites(favoritesData);
@@ -51,10 +51,11 @@ const DetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // Salvar favoritos no armazenamento
+  // Salvar favoritos no armazenamento - CORRIGIDO PARA WEB
   const saveFavorites = async (newFavorites) => {
     try {
-      await SecureStore.setItemAsync(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
+      // Usar localStorage para web
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
     } catch (err) {
       console.error('Erro ao salvar favoritos:', err);
     }
