@@ -1,4 +1,4 @@
-// src/screens/LoginScreen.js - Versão limpa e corrigida
+// src/screens/LoginScreen.js - Versão final integrada com backend
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,8 +10,8 @@ import {
   StatusBar,
   SafeAreaView,
   Dimensions,
-  Platform,
   ImageBackground,
+  Alert,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
@@ -21,6 +21,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 // Importar contexto do usuário
 import { useUser } from '../contexts/UserContext';
+
+// Importar serviços
+import { authenticateWithGoogle, testApiConnection } from '../services/api';
 
 // Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
@@ -34,22 +37,7 @@ const LoginScreen = ({ navigation }) => {
   const { login } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [dimensions, setDimensions] = useState({
-    width: screenDimensions.width,
-    height: screenDimensions.height,
-  });
-
-  // Configurar listener de dimensões da tela para responsividade
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setDimensions({
-        width: window.width,
-        height: window.height,
-      });
-    });
-    
-    return () => subscription?.remove();
-  }, []);
+  const [apiStatus, setApiStatus] = useState('checking'); // 'checking', 'connected', 'error'
 
   // Configurar solicitação de autenticação do Google
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -59,46 +47,96 @@ const LoginScreen = ({ navigation }) => {
     }),
   });
 
+  // Testar conexão com API ao carregar a tela
+  useEffect(() => {
+    checkApiConnection();
+  }, []);
+
   // Tratar resposta da autenticação
   useEffect(() => {
-    console.log('Resposta da autenticação:', response);
+    console.log('📱 Resposta da autenticação Google:', response?.type);
 
     if (response?.type === 'success') {
       setLoading(true);
       const { authentication } = response;
-      getUserInfo(authentication.accessToken);
+      handleGoogleAuth(authentication.accessToken);
     } else if (response?.type === 'error') {
       setError('Falha na autenticação. Tente novamente.');
       setLoading(false);
     }
   }, [response]);
 
-  // Obter informações do usuário após autenticação bem-sucedida
-  const getUserInfo = async (token) => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
+  // Verificar conexão com a API
+  const checkApiConnection = async () => {
     try {
-      const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error('Falha ao obter informações do usuário');
-      }
-
-      const user = await response.json();
-      console.log('Login bem-sucedido:', user);
-
-      // Usar o contexto para fazer login
-      await login(token, user);
+      console.log('🔍 Verificando conexão com API...');
+      setApiStatus('checking');
       
-      // A navegação será automática através do AppNavigator quando isAuthenticated mudar
+      const result = await testApiConnection();
+      
+      if (result.success) {
+        console.log('✅ API conectada:', result.data.status);
+        setApiStatus('connected');
+      } else {
+        console.log('❌ API desconectada:', result.error);
+        setApiStatus('error');
+        setError('Não foi possível conectar com o servidor. Verifique se o Flask está rodando.');
+      }
     } catch (error) {
-      console.error('Erro ao obter informações do usuário:', error);
-      setError('Erro ao obter informações do usuário.');
+      console.error('❌ Erro ao testar API:', error);
+      setApiStatus('error');
+      setError('Erro de conexão com o servidor.');
+    }
+  };
+
+  // Autenticar com Google através do backend
+  const handleGoogleAuth = async (googleToken) => {
+    try {
+      console.log('🔑 Autenticando com backend Flask...');
+      
+      // Verificar se API está disponível
+      if (apiStatus !== 'connected') {
+        throw new Error('API não está disponível. Verifique a conexão.');
+      }
+      
+      // Enviar token do Google para o backend Flask
+      const authResult = await authenticateWithGoogle(googleToken);
+      
+      console.log('✅ Autenticação bem-sucedida:', authResult.user);
+      
+      // Fazer login no contexto local
+      await login(authResult.token, authResult.user);
+      
+      // Mostrar feedback de sucesso
+      Alert.alert(
+        'Login realizado!',
+        `Bem-vindo, ${authResult.user.name}!`,
+        [{ text: 'Continuar', style: 'default' }]
+      );
+      
+    } catch (error) {
+      console.error('❌ Erro na autenticação:', error);
+      
+      let errorMessage = 'Erro ao conectar com o servidor.';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Token do Google inválido. Tente novamente.';
+      } else if (error.message?.includes('Network Error')) {
+        errorMessage = 'Sem conexão com o servidor. Verifique se o Flask está rodando.';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      setError(errorMessage);
+      
+      Alert.alert(
+        'Erro na autenticação',
+        errorMessage,
+        [
+          { text: 'Tentar novamente', onPress: () => setError(null) },
+          { text: 'Verificar conexão', onPress: checkApiConnection }
+        ]
+      );
     } finally {
       setLoading(false);
     }
@@ -106,13 +144,65 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLoginPress = async () => {
     setError(null);
-    try {
-      const result = await promptAsync();
-      console.log('Resultado do promptAsync:', result);
-    } catch (e) {
-      setError('Erro ao iniciar autenticação');
-      console.error(e);
+    
+    // Verificar conexão com API antes de tentar login
+    if (apiStatus === 'error') {
+      Alert.alert(
+        'Sem conexão',
+        'Não foi possível conectar com o servidor. Deseja verificar a conexão novamente?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Verificar', onPress: checkApiConnection }
+        ]
+      );
+      return;
     }
+    
+    try {
+      console.log('🚀 Iniciando autenticação Google...');
+      const result = await promptAsync();
+      console.log('📱 Resultado do Google OAuth:', result.type);
+    } catch (e) {
+      console.error('❌ Erro ao iniciar autenticação:', e);
+      setError('Erro ao iniciar autenticação');
+    }
+  }
+
+  // Renderizar indicador de status da API
+  const renderApiStatus = () => {
+    let statusColor, statusIcon, statusText;
+    
+    switch (apiStatus) {
+      case 'checking':
+        statusColor = COLORS.textSecondary;
+        statusIcon = 'time-outline';
+        statusText = 'Verificando conexão...';
+        break;
+      case 'connected':
+        statusColor = '#10B981'; // verde
+        statusIcon = 'checkmark-circle';
+        statusText = 'Servidor conectado';
+        break;
+      case 'error':
+        statusColor = COLORS.notification;
+        statusIcon = 'alert-circle';
+        statusText = 'Servidor desconectado';
+        break;
+    }
+    
+    return (
+      <View style={styles.statusContainer}>
+        <Ionicons name={statusIcon} size={16} color={statusColor} />
+        <Text style={[styles.statusText, { color: statusColor }]}>
+          {statusText}
+        </Text>
+        {apiStatus === 'error' && (
+          <TouchableOpacity onPress={checkApiConnection} style={styles.retryButton}>
+            <Ionicons name="refresh" size={16} color={COLORS.accent} />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -132,6 +222,7 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.subtitle}>
               Descubra a imagem astronômica do dia da NASA
             </Text>
+            {renderApiStatus()}
           </View>
 
           <View style={styles.contentContainer}>
@@ -152,17 +243,26 @@ const LoginScreen = ({ navigation }) => {
 
             {error && (
               <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={20} color="#fff" style={styles.errorIcon} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
             <TouchableOpacity
-              style={[styles.loginButton, (!request || loading) && styles.buttonDisabled]}
+              style={[
+                styles.loginButton, 
+                (!request || loading || apiStatus !== 'connected') && styles.buttonDisabled
+              ]}
               onPress={handleLoginPress}
-              disabled={!request || loading}
+              disabled={!request || loading || apiStatus !== 'connected'}
             >
               {loading ? (
-                <ActivityIndicator color={COLORS.text} />
+                <View style={styles.buttonContent}>
+                  <ActivityIndicator color={COLORS.text} size="small" />
+                  <Text style={[styles.loginButtonText, { marginLeft: 10 }]}>
+                    Conectando...
+                  </Text>
+                </View>
               ) : (
                 <View style={styles.buttonContent}>
                   <Image 
@@ -227,6 +327,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     maxWidth: '80%',
   },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 10,
+  },
+  statusText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  retryButton: {
+    marginLeft: 8,
+    padding: 2,
+  },
   contentContainer: {
     width: '100%',
     maxWidth: 400,
@@ -249,17 +367,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   errorContainer: {
-    backgroundColor: 'rgba(231, 76, 60, 0.8)',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: 'rgba(231, 76, 60, 0.9)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 20,
     width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  errorIcon: {
+    marginRight: 8,
   },
   errorText: {
     color: '#fff',
-    textAlign: 'center',
-    fontSize: 16,
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 18,
   },
   loginButton: {
     backgroundColor: COLORS.accent,
@@ -304,5 +428,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
 
 export default LoginScreen;

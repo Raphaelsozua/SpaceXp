@@ -1,4 +1,4 @@
-// src/screens/DetailScreen.js - Completo e corrigido para web
+// src/screens/DetailScreen.js - Corrigido para scroll completo
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -19,120 +19,185 @@ import { Ionicons } from '@expo/vector-icons';
 // Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
 
-// Chave para armazenar favoritos
-const FAVORITES_STORAGE_KEY = 'apod_favorites';
+// Importar funções da API
+import { getFavorites, addToFavorites, removeFromFavorites } from '../services/api';
 
 const DetailScreen = ({ route, navigation }) => {
   const { apod } = route.params;
   const [imageLoading, setImageLoading] = useState(true);
-  const [favorites, setFavorites] = useState([]);
+  const [imageError, setImageError] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-  // Verificar se a imagem é um favorito ao carregar a tela
   useEffect(() => {
-    loadFavorites();
+    checkIfFavorite();
+    
+    // Correção específica para scroll da DetailScreen
+    const originalStyles = new Map();
+    
+    const enableScroll = () => {
+      // 1. Encontrar elementos que estão bloqueando o scroll especificamente
+      const blockers = document.querySelectorAll('*');
+      
+      blockers.forEach(el => {
+        const styles = getComputedStyle(el);
+        
+        // Focar apenas em elementos que realmente bloqueiam scroll
+        if (styles.pointerEvents === 'none' && 
+            (styles.position === 'fixed' || styles.position === 'absolute') &&
+            (styles.top === '0px' || styles.top === 'auto') &&
+            (styles.left === '0px' || styles.left === 'auto') &&
+            (styles.right === '0px' || styles.right === 'auto') &&
+            (styles.bottom === '0px' || styles.bottom === 'auto')) {
+          
+          // Salvar estado original
+          if (!originalStyles.has(el)) {
+            originalStyles.set(el, el.style.pointerEvents);
+          }
+          
+          // Permitir interação apenas se não for um elemento essencial da UI
+          if (!el.closest('[role="button"]') && 
+              !el.closest('[role="navigation"]') &&
+              !el.getAttribute('aria-label')) {
+            el.style.pointerEvents = 'auto';
+          }
+        }
+      });
+      
+      // 2. Garantir que o ScrollView funcione
+      const scrollViews = document.querySelectorAll('[style*="overflow"]');
+      scrollViews.forEach(sv => {
+        if (!originalStyles.has(sv)) {
+          originalStyles.set(sv, sv.style.overflow);
+        }
+        sv.style.overflow = 'auto';
+      });
+    };
+    
+    const cleanup = () => {
+      originalStyles.forEach((originalValue, el) => {
+        if (el && el.style) {
+          el.style.pointerEvents = originalValue || '';
+        }
+      });
+      originalStyles.clear();
+    };
+    
+    enableScroll();
+    const timeout = setTimeout(enableScroll, 200);
+    
+    return cleanup;
   }, []);
 
-  // Carregar favoritos do armazenamento - CORRIGIDO PARA WEB
-  const loadFavorites = async () => {
+  const checkIfFavorite = async () => {
     try {
-      // Usar localStorage para web
-      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
-      if (storedFavorites) {
-        const favoritesData = JSON.parse(storedFavorites);
-        setFavorites(favoritesData);
-        
-        // Verificar se o item atual está nos favoritos
-        const itemIsFavorite = favoritesData.some(fav => fav.date === apod.date);
-        setIsFavorite(itemIsFavorite);
+      const favorites = await getFavorites();
+      const itemIsFavorite = favorites.some(fav => fav.date === apod.date);
+      setIsFavorite(itemIsFavorite);
+    } catch (error) {
+      console.error('Erro ao verificar favoritos:', error);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (favoriteLoading) return;
+    
+    setFavoriteLoading(true);
+    
+    try {
+      if (isFavorite) {
+        await removeFromFavorites(apod.date);
+        setIsFavorite(false);
+      } else {
+        await addToFavorites(apod);
+        setIsFavorite(true);
       }
-    } catch (err) {
-      console.error('Erro ao carregar favoritos:', err);
+    } catch (error) {
+      console.error('Erro ao alterar favorito:', error);
+      window.alert('Erro ao salvar favorito. Tente novamente.');
+    } finally {
+      setFavoriteLoading(false);
     }
   };
 
-  // Salvar favoritos no armazenamento - CORRIGIDO PARA WEB
-  const saveFavorites = async (newFavorites) => {
-    try {
-      // Usar localStorage para web
-      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
-    } catch (err) {
-      console.error('Erro ao salvar favoritos:', err);
-    }
-  };
-
-  // Toggle favorito
-  const toggleFavorite = () => {
-    let newFavorites;
-
-    if (isFavorite) {
-      // Remover dos favoritos
-      newFavorites = favorites.filter(fav => fav.date !== apod.date);
-    } else {
-      // Adicionar aos favoritos
-      newFavorites = [...favorites, apod];
-    }
-
-    setFavorites(newFavorites);
-    setIsFavorite(!isFavorite);
-    saveFavorites(newFavorites);
-  };
-
-  // Compartilhar a APOD
   const handleShare = async () => {
     try {
-      await Share.share({
-        message: `${apod.title} - ${apod.explanation}\n\nConfira esta incrível imagem astronômica da NASA: ${apod.url}`,
-        title: 'Astronomy Picture of the Day',
-      });
+      if (navigator.share) {
+        await navigator.share({
+          title: apod.title,
+          text: apod.explanation,
+          url: apod.url
+        });
+      } else {
+        await navigator.clipboard.writeText(`${apod.title}\n\n${apod.explanation}\n\n${apod.url}`);
+        window.alert('Link copiado para a área de transferência!');
+      }
     } catch (error) {
       console.error('Erro ao compartilhar:', error);
     }
   };
 
-  // Formatar a data (YYYY-MM-DD para DD/MM/YYYY)
   const formatDate = (dateString) => {
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
   };
 
-  // Abrir URL do vídeo se for um vídeo
   const handleVideoPress = () => {
     if (apod.media_type === 'video' && apod.url) {
-      Linking.openURL(apod.url).catch((err) => 
-        console.error('Erro ao abrir URL do vídeo:', err)
-      );
+      window.open(apod.url, '_blank');
     }
   };
 
-  // Determinar URL da imagem
   const imageUrl = apod.media_type === 'image' 
-    ? apod.url 
+    ? apod.hdurl || apod.url 
     : (apod.thumbnail_url || 'https://via.placeholder.com/500x300/121212/6366F1?text=Video');
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        scrollEnabled={true}
+        nestedScrollEnabled={true}
+      >
         <View style={styles.imageContainer}>
-          {imageLoading && (
+          {imageLoading && !imageError && (
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="large" color={COLORS.accent} />
+              <Text style={styles.loadingText}>Carregando imagem...</Text>
+            </View>
+          )}
+          
+          {imageError && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="image-outline" size={60} color={COLORS.textSecondary} />
+              <Text style={styles.errorText}>Erro ao carregar imagem</Text>
             </View>
           )}
           
           <TouchableOpacity
             activeOpacity={apod.media_type === 'video' ? 0.7 : 1}
             onPress={apod.media_type === 'video' ? handleVideoPress : null}
+            style={styles.imageWrapper}
           >
             <Image
               source={{ uri: imageUrl }}
               style={styles.image}
-              onLoadStart={() => setImageLoading(true)}
+              resizeMode="cover"
+              onLoadStart={() => {
+                setImageLoading(true);
+                setImageError(false);
+              }}
               onLoadEnd={() => setImageLoading(false)}
+              onError={() => {
+                setImageLoading(false);
+                setImageError(true);
+              }}
             />
             
-            {apod.media_type === 'video' && (
+            {apod.media_type === 'video' && !imageError && (
               <View style={styles.videoOverlay}>
                 <Ionicons name="play-circle" size={60} color="white" />
                 <Text style={styles.videoText}>Toque para abrir o vídeo</Text>
@@ -148,12 +213,17 @@ const DetailScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={toggleFavorite}
+                disabled={favoriteLoading}
               >
-                <Ionicons
-                  name={isFavorite ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={isFavorite ? COLORS.notification : COLORS.text}
-                />
+                {favoriteLoading ? (
+                  <ActivityIndicator size="small" color={COLORS.text} />
+                ) : (
+                  <Ionicons
+                    name={isFavorite ? 'heart' : 'heart-outline'}
+                    size={24}
+                    color={isFavorite ? COLORS.notification : COLORS.text}
+                  />
+                )}
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -216,16 +286,24 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    // Completamente removido - deixar vazio para teste
   },
   imageContainer: {
     width: width,
-    height: width * 0.75, // Proporção 4:3
+    height: width * 0.6, // Altura menor para dar mais espaço ao texto
     position: 'relative',
+    backgroundColor: COLORS.primary,
+  },
+  imageWrapper: {
+    width: '100%',
+    height: '100%',
   },
   image: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   loaderContainer: {
     position: 'absolute',
@@ -236,8 +314,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.primary,
-    opacity: 0.7,
     zIndex: 1,
+  },
+  loadingText: {
+    color: COLORS.text,
+    marginTop: 10,
+    fontSize: 14,
+  },
+  errorContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    zIndex: 1,
+  },
+  errorText: {
+    color: COLORS.textSecondary,
+    marginTop: 10,
+    fontSize: 14,
   },
   videoOverlay: {
     position: 'absolute',
@@ -257,6 +355,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    // REMOVIDO flex: 1 para permitir expansão natural
   },
   header: {
     flexDirection: 'row',
@@ -296,8 +395,9 @@ const styles = StyleSheet.create({
   explanation: {
     fontSize: 16,
     color: COLORS.text,
-    lineHeight: 24,
-    marginBottom: 20,
+    lineHeight: 26, // Melhor espaçamento para leitura
+    marginBottom: 30,
+    textAlign: 'justify', // Justificar texto para melhor aparência
   },
   videoButton: {
     flexDirection: 'row',
@@ -319,7 +419,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 20, // Espaço final para o scroll
   },
   infoItem: {
     flexDirection: 'row',

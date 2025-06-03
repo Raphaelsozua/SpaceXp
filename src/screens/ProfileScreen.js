@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Switch,
   ScrollView,
   StatusBar,
   SafeAreaView,
@@ -15,12 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 // Importar contexto do usuário
 import { useUser } from '../contexts/UserContext';
 
+// Importar função para buscar favoritos
+import { getFavorites } from '../services/api'; // Ajuste o caminho conforme sua estrutura
+
 // Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
-
-// Chaves para armazenamento
-const SETTINGS_STORAGE_KEY = 'app_settings';
-const FAVORITES_STORAGE_KEY = 'apod_favorites';
 
 const ProfileScreen = () => {
   const { 
@@ -32,80 +30,35 @@ const ProfileScreen = () => {
   } = useUser();
   
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({
-    visualizations: 0,
-    favorites: 0,
-    shares: 0,
-  });
-  const [settings, setSettings] = useState({
-    darkMode: true,
-    notifications: true,
-    highQualityImages: true,
-    autoPlay: false,
-  });
+  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
 
-  // Carregar estatísticas e configurações ao iniciar o componente
+  // Carregar contador de favoritos ao iniciar
   useEffect(() => {
-    loadStats();
-    loadSettings();
+    loadFavoritesCount();
   }, []);
 
-  const loadStats = async () => {
+  const loadFavoritesCount = async () => {
     try {
-      // Carregar estatísticas dos favoritos
-      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
-      const favoritesCount = storedFavorites ? JSON.parse(storedFavorites).length : 0;
+      setLoadingFavorites(true);
+      const favorites = await getFavorites();
+      setFavoritesCount(favorites.length);
+    } catch (error) {
+      console.error('Erro ao carregar favoritos:', error);
+      setFavoritesCount(0);
       
-      // Carregar outras estatísticas (simuladas por enquanto)
-      const storedStats = localStorage.getItem('user_stats');
-      if (storedStats) {
-        const parsedStats = JSON.parse(storedStats);
-        setStats({
-          ...parsedStats,
-          favorites: favoritesCount,
-        });
-      } else {
-        setStats({
-          visualizations: Math.floor(Math.random() * 50) + 10,
-          favorites: favoritesCount,
-          shares: Math.floor(Math.random() * 20) + 1,
-        });
+      // Se o erro for de autenticação (401), pode ser que o token expirou
+      if (error.response?.status === 401) {
+        console.log('Token expirado, fazendo logout...');
+        // O contexto deve lidar com isso automaticamente
       }
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+    } finally {
+      setLoadingFavorites(false);
     }
   };
 
-  const loadSettings = async () => {
-    try {
-      const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (storedSettings) {
-        setSettings(JSON.parse(storedSettings));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
-    }
-  };
-
-  // Salvar configurações no armazenamento
-  const saveSettings = async (newSettings) => {
-    try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
-    } catch (error) {
-      console.error('Erro ao salvar configurações:', error);
-    }
-  };
-
-  // Alterar uma configuração específica
-  const handleSettingChange = (key, value) => {
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    saveSettings(newSettings);
-  };
-
-  // Realizar logout usando confirm nativo (mais compatível com web)
+  // Realizar logout usando confirm nativo
   const handleLogout = () => {
-    // Usar confirm nativo do browser em vez de Alert do React Native
     const confirmed = window.confirm('Tem certeza que deseja sair da sua conta?');
     
     if (confirmed) {
@@ -117,18 +70,27 @@ const ProfileScreen = () => {
   const performLogout = async () => {
     try {
       setLoading(true);
-      
-      // Usar o logout do contexto
       await logout();
-      
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
-      // Usar alert nativo do browser
       window.alert('Erro: Não foi possível realizar o logout. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
+
+  // Função para atualizar a contagem (pode ser chamada quando voltar de outras telas)
+  const refreshFavoritesCount = () => {
+    loadFavoritesCount();
+  };
+
+  // Use useFocusEffect se você quiser atualizar sempre que a tela ganhar foco
+  // import { useFocusEffect } from '@react-navigation/native';
+  // useFocusEffect(
+  //   React.useCallback(() => {
+  //     loadFavoritesCount();
+  //   }, [])
+  // );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -153,92 +115,23 @@ const ProfileScreen = () => {
               <Text style={styles.profileEmail}>{getDisplayEmail()}</Text>
             </View>
           </View>
-          
-          <TouchableOpacity 
-            style={styles.editButton}
-            onPress={() => window.alert('Edição de perfil não disponível nesta versão.')}
-          >
-            <Ionicons name="pencil-outline" size={20} color={COLORS.text} />
-          </TouchableOpacity>
         </View>
 
-        {/* Estatísticas */}
+        {/* Estatística de Favoritos */}
         <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.visualizations}</Text>
-            <Text style={styles.statLabel}>Visualizações</Text>
-          </View>
-          <View style={[styles.statItem, styles.statBorder]}>
-            <Text style={styles.statValue}>{stats.favorites}</Text>
+          <TouchableOpacity 
+            style={styles.statItem}
+            onPress={refreshFavoritesCount}
+          >
+            <Ionicons name="heart" size={32} color={COLORS.notification} />
+            <Text style={styles.statValue}>
+              {loadingFavorites ? '...' : favoritesCount}
+            </Text>
             <Text style={styles.statLabel}>Favoritos</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.shares}</Text>
-            <Text style={styles.statLabel}>Compartilhamentos</Text>
-          </View>
-        </View>
-
-        {/* Configurações */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configurações</Text>
-          
-          <View style={styles.settingsContainer}>
-            {/* Modo escuro */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="moon-outline" size={22} color={COLORS.text} style={styles.settingIcon} />
-                <Text style={styles.settingText}>Modo escuro</Text>
-              </View>
-              <Switch
-                value={settings.darkMode}
-                onValueChange={(value) => handleSettingChange('darkMode', value)}
-                trackColor={{ false: COLORS.border, true: COLORS.accent }}
-                thumbColor={settings.darkMode ? COLORS.text : COLORS.textSecondary}
-              />
-            </View>
-            
-            {/* Notificações */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="notifications-outline" size={22} color={COLORS.text} style={styles.settingIcon} />
-                <Text style={styles.settingText}>Notificações</Text>
-              </View>
-              <Switch
-                value={settings.notifications}
-                onValueChange={(value) => handleSettingChange('notifications', value)}
-                trackColor={{ false: COLORS.border, true: COLORS.accent }}
-                thumbColor={settings.notifications ? COLORS.text : COLORS.textSecondary}
-              />
-            </View>
-            
-            {/* Imagens de alta qualidade */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="image-outline" size={22} color={COLORS.text} style={styles.settingIcon} />
-                <Text style={styles.settingText}>Imagens de alta qualidade</Text>
-              </View>
-              <Switch
-                value={settings.highQualityImages}
-                onValueChange={(value) => handleSettingChange('highQualityImages', value)}
-                trackColor={{ false: COLORS.border, true: COLORS.accent }}
-                thumbColor={settings.highQualityImages ? COLORS.text : COLORS.textSecondary}
-              />
-            </View>
-            
-            {/* Auto-reprodução de vídeos */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="play-outline" size={22} color={COLORS.text} style={styles.settingIcon} />
-                <Text style={styles.settingText}>Auto-reprodução de vídeos</Text>
-              </View>
-              <Switch
-                value={settings.autoPlay}
-                onValueChange={(value) => handleSettingChange('autoPlay', value)}
-                trackColor={{ false: COLORS.border, true: COLORS.accent }}
-                thumbColor={settings.autoPlay ? COLORS.text : COLORS.textSecondary}
-              />
-            </View>
-          </View>
+            {loadingFavorites && (
+              <Text style={styles.loadingText}>Carregando...</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Informações do aplicativo */}
@@ -318,6 +211,7 @@ const styles = StyleSheet.create({
   profileInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   profileImage: {
     width: 60,
@@ -347,41 +241,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
   },
-  editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   statsContainer: {
-    flexDirection: 'row',
     backgroundColor: COLORS.card,
     borderRadius: 12,
     marginBottom: 24,
+    padding: 20,
+    alignItems: 'center',
     ...COMMON_STYLES.shadow,
   },
   statItem: {
-    flex: 1,
-    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statBorder: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: COLORS.border,
-  },
   statValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.text,
+    marginTop: 8,
     marginBottom: 4,
   },
   statLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  loadingText: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    marginTop: 4,
   },
   section: {
     marginBottom: 24,
@@ -391,32 +277,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.text,
     marginBottom: 12,
-  },
-  settingsContainer: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    overflow: 'hidden',
-    ...COMMON_STYLES.shadow,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  settingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  settingIcon: {
-    marginRight: 12,
-  },
-  settingText: {
-    fontSize: 16,
-    color: COLORS.text,
   },
   aboutContainer: {
     backgroundColor: COLORS.card,

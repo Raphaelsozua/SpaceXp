@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.js - Corrigido para web
+// src/screens/HomeScreen.js - Atualizado para usar backend Flask
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   StatusBar,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,18 +18,21 @@ import { useFocusEffect } from '@react-navigation/native';
 // Importar componentes
 import APODCard from '../components/APODCard';
 
-// Importar serviços
-import { getAPOD, getRandomAPODs } from '../services/api';
+// Importar serviços - ATUALIZADO PARA BACKEND
+import { 
+  getAPOD, 
+  getRandomAPODs, 
+  addToFavorites, 
+  removeFromFavorites, 
+  checkIsFavorite 
+} from '../services/api';
 
 // Importar constantes
 import { COLORS } from '../config/constants';
 
-// Chave para armazenamento de favoritos
-const FAVORITES_STORAGE_KEY = 'apod_favorites';
-
 const HomeScreen = () => {
   const [data, setData] = useState([]);
-  const [favorites, setFavorites] = useState([]);
+  const [favoritesStatus, setFavoritesStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -37,17 +41,16 @@ const HomeScreen = () => {
   // Carregar dados ao iniciar o componente
   useEffect(() => {
     loadData();
-    loadFavorites();
-  }, []);
+  }, [viewMode]);
 
-  // Recarregar favoritos quando a tela receber foco
+  // Recarregar ao focar na tela
   useFocusEffect(
     useCallback(() => {
-      loadFavorites();
-    }, [])
+      loadFavoritesStatus();
+    }, [data])
   );
 
-  // Carregar dados da API APOD
+  // Carregar dados da API APOD através do backend
   const loadData = async () => {
     try {
       setLoading(true);
@@ -61,60 +64,71 @@ const HomeScreen = () => {
       } else {
         // Buscar APODs aleatórias
         result = await getRandomAPODs(10);
-        setData(result);
+        setData(Array.isArray(result) ? result : [result]);
       }
+
+      // Carregar status dos favoritos
+      await loadFavoritesStatus(Array.isArray(result) ? result : [result]);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
-      setError('Não foi possível carregar os dados. Tente novamente.');
+      setError('Não foi possível carregar os dados. Verifique sua conexão.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Carregar favoritos do armazenamento - CORRIGIDO PARA WEB
-  const loadFavorites = async () => {
+  // Carregar status dos favoritos para cada item
+  const loadFavoritesStatus = async (items = data) => {
     try {
-      // Usar localStorage para web
-      const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
-      if (storedFavorites) {
-        setFavorites(JSON.parse(storedFavorites));
+      const statusPromises = items.map(async (item) => {
+        try {
+          const isFav = await checkIsFavorite(item.date);
+          return { [item.date]: isFav };
+        } catch (error) {
+          console.error(`Erro ao verificar favorito ${item.date}:`, error);
+          return { [item.date]: false };
+        }
+      });
+
+      const statusResults = await Promise.all(statusPromises);
+      const newStatus = statusResults.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      
+      setFavoritesStatus(newStatus);
+    } catch (err) {
+      console.error('Erro ao carregar status dos favoritos:', err);
+    }
+  };
+
+  // Adicionar ou remover favorito usando o backend
+  const toggleFavorite = async (apod) => {
+    try {
+      const isCurrentlyFavorite = favoritesStatus[apod.date];
+
+      if (isCurrentlyFavorite) {
+        // Remover dos favoritos
+        await removeFromFavorites(apod.date);
+        setFavoritesStatus(prev => ({ ...prev, [apod.date]: false }));
+        
+        // Feedback visual
+        Alert.alert('Removido', 'Item removido dos favoritos', [{ text: 'OK' }]);
+      } else {
+        // Adicionar aos favoritos
+        await addToFavorites(apod);
+        setFavoritesStatus(prev => ({ ...prev, [apod.date]: true }));
+        
+        // Feedback visual
+        Alert.alert('Adicionado', 'Item adicionado aos favoritos', [{ text: 'OK' }]);
       }
     } catch (err) {
-      console.error('Erro ao carregar favoritos:', err);
+      console.error('Erro ao toggle favorito:', err);
+      Alert.alert('Erro', 'Não foi possível atualizar favoritos. Tente novamente.');
     }
-  };
-
-  // Salvar favoritos no armazenamento - CORRIGIDO PARA WEB
-  const saveFavorites = async (newFavorites) => {
-    try {
-      // Usar localStorage para web
-      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
-    } catch (err) {
-      console.error('Erro ao salvar favoritos:', err);
-    }
-  };
-
-  // Adicionar ou remover favorito
-  const toggleFavorite = (apod) => {
-    const isFavorite = favorites.some(fav => fav.date === apod.date);
-    let newFavorites;
-
-    if (isFavorite) {
-      // Remover dos favoritos
-      newFavorites = favorites.filter(fav => fav.date !== apod.date);
-    } else {
-      // Adicionar aos favoritos
-      newFavorites = [...favorites, apod];
-    }
-
-    setFavorites(newFavorites);
-    saveFavorites(newFavorites);
   };
 
   // Verificar se um item é favorito
   const isFavorite = (item) => {
-    return favorites.some(fav => fav.date === item.date);
+    return favoritesStatus[item.date] || false;
   };
 
   // Recarregar dados ao puxar para baixo
@@ -128,9 +142,6 @@ const HomeScreen = () => {
     const newMode = viewMode === 'today' ? 'random' : 'today';
     setViewMode(newMode);
     setData([]);
-    setTimeout(() => {
-      loadData();
-    }, 100);
   };
 
   // Renderizar item da lista
@@ -167,7 +178,8 @@ const HomeScreen = () => {
       <SafeAreaView style={styles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
         <ActivityIndicator size="large" color={COLORS.accent} />
-        <Text style={styles.loadingText}>Carregando imagens astronômicas...</Text>
+        <Text style={styles.loadingText}>Conectando ao servidor...</Text>
+        <Text style={styles.loadingSubtext}>Carregando imagens astronômicas...</Text>
       </SafeAreaView>
     );
   }
@@ -179,6 +191,9 @@ const HomeScreen = () => {
         <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
         <Ionicons name="alert-circle-outline" size={60} color={COLORS.notification} />
         <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorSubtext}>
+          Verifique se o servidor Flask está rodando na porta 5000
+        </Text>
         <TouchableOpacity style={styles.retryButton} onPress={loadData}>
           <Text style={styles.retryButtonText}>Tentar novamente</Text>
         </TouchableOpacity>
@@ -226,6 +241,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
+    flex: 1,
   },
   viewModeButton: {
     width: 40,
@@ -245,9 +261,16 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: 16,
+    fontSize: 18,
     color: COLORS.text,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
   errorContainer: {
@@ -258,21 +281,29 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: 16,
+    fontSize: 18,
     color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
   retryButton: {
     backgroundColor: COLORS.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
     color: COLORS.text,
     fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
