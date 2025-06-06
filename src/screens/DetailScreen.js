@@ -1,4 +1,3 @@
-// src/screens/DetailScreen.js - Corrigido para scroll completo
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -12,14 +11,9 @@ import {
   Dimensions,
   Linking,
   StatusBar,
-  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-// Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
-
-// Importar funções da API
 import { getFavorites, addToFavorites, removeFromFavorites } from '../services/api';
 
 const DetailScreen = ({ route, navigation }) => {
@@ -31,62 +25,6 @@ const DetailScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     checkIfFavorite();
-    
-    // Correção específica para scroll da DetailScreen
-    const originalStyles = new Map();
-    
-    const enableScroll = () => {
-      // 1. Encontrar elementos que estão bloqueando o scroll especificamente
-      const blockers = document.querySelectorAll('*');
-      
-      blockers.forEach(el => {
-        const styles = getComputedStyle(el);
-        
-        // Focar apenas em elementos que realmente bloqueiam scroll
-        if (styles.pointerEvents === 'none' && 
-            (styles.position === 'fixed' || styles.position === 'absolute') &&
-            (styles.top === '0px' || styles.top === 'auto') &&
-            (styles.left === '0px' || styles.left === 'auto') &&
-            (styles.right === '0px' || styles.right === 'auto') &&
-            (styles.bottom === '0px' || styles.bottom === 'auto')) {
-          
-          // Salvar estado original
-          if (!originalStyles.has(el)) {
-            originalStyles.set(el, el.style.pointerEvents);
-          }
-          
-          // Permitir interação apenas se não for um elemento essencial da UI
-          if (!el.closest('[role="button"]') && 
-              !el.closest('[role="navigation"]') &&
-              !el.getAttribute('aria-label')) {
-            el.style.pointerEvents = 'auto';
-          }
-        }
-      });
-      
-      // 2. Garantir que o ScrollView funcione
-      const scrollViews = document.querySelectorAll('[style*="overflow"]');
-      scrollViews.forEach(sv => {
-        if (!originalStyles.has(sv)) {
-          originalStyles.set(sv, sv.style.overflow);
-        }
-        sv.style.overflow = 'auto';
-      });
-    };
-    
-    const cleanup = () => {
-      originalStyles.forEach((originalValue, el) => {
-        if (el && el.style) {
-          el.style.pointerEvents = originalValue || '';
-        }
-      });
-      originalStyles.clear();
-    };
-    
-    enableScroll();
-    const timeout = setTimeout(enableScroll, 200);
-    
-    return cleanup;
   }, []);
 
   const checkIfFavorite = async () => {
@@ -101,9 +39,7 @@ const DetailScreen = ({ route, navigation }) => {
 
   const toggleFavorite = async () => {
     if (favoriteLoading) return;
-    
     setFavoriteLoading(true);
-    
     try {
       if (isFavorite) {
         await removeFromFavorites(apod.date);
@@ -114,7 +50,6 @@ const DetailScreen = ({ route, navigation }) => {
       }
     } catch (error) {
       console.error('Erro ao alterar favorito:', error);
-      window.alert('Erro ao salvar favorito. Tente novamente.');
     } finally {
       setFavoriteLoading(false);
     }
@@ -122,16 +57,11 @@ const DetailScreen = ({ route, navigation }) => {
 
   const handleShare = async () => {
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: apod.title,
-          text: apod.explanation,
-          url: apod.url
-        });
-      } else {
-        await navigator.clipboard.writeText(`${apod.title}\n\n${apod.explanation}\n\n${apod.url}`);
-        window.alert('Link copiado para a área de transferência!');
-      }
+      await Share.share({
+        title: apod.title,
+        message: `${apod.title}\n\n${apod.explanation}\n\n${apod.url}`,
+        url: apod.url
+      });
     } catch (error) {
       console.error('Erro ao compartilhar:', error);
     }
@@ -144,24 +74,24 @@ const DetailScreen = ({ route, navigation }) => {
 
   const handleVideoPress = () => {
     if (apod.media_type === 'video' && apod.url) {
-      window.open(apod.url, '_blank');
+      Linking.openURL(apod.url);
     }
   };
 
-  const imageUrl = apod.media_type === 'image' 
-    ? apod.hdurl || apod.url 
+  const imageUrl = apod.media_type === 'image'
+    ? apod.hdurl || apod.url
     : (apod.thumbnail_url || 'https://via.placeholder.com/500x300/121212/6366F1?text=Video');
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-      <ScrollView 
-        style={{ flex: 1 }}
-        showsVerticalScrollIndicator={true}
-        bounces={true}
-        scrollEnabled={true}
-        nestedScrollEnabled={true}
+      {/* Conteúdo scrollável */}
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
+        {/* Cabeçalho com imagem */}
         <View style={styles.imageContainer}>
           {imageLoading && !imageError && (
             <View style={styles.loaderContainer}>
@@ -169,14 +99,12 @@ const DetailScreen = ({ route, navigation }) => {
               <Text style={styles.loadingText}>Carregando imagem...</Text>
             </View>
           )}
-          
           {imageError && (
             <View style={styles.errorContainer}>
               <Ionicons name="image-outline" size={60} color={COLORS.textSecondary} />
               <Text style={styles.errorText}>Erro ao carregar imagem</Text>
             </View>
           )}
-          
           <TouchableOpacity
             activeOpacity={apod.media_type === 'video' ? 0.7 : 1}
             onPress={apod.media_type === 'video' ? handleVideoPress : null}
@@ -196,7 +124,6 @@ const DetailScreen = ({ route, navigation }) => {
                 setImageError(true);
               }}
             />
-            
             {apod.media_type === 'video' && !imageError && (
               <View style={styles.videoOverlay}>
                 <Ionicons name="play-circle" size={60} color="white" />
@@ -205,6 +132,7 @@ const DetailScreen = ({ route, navigation }) => {
             )}
           </TouchableOpacity>
         </View>
+
 
         <View style={styles.contentContainer}>
           <View style={styles.header}>
@@ -225,7 +153,6 @@ const DetailScreen = ({ route, navigation }) => {
                   />
                 )}
               </TouchableOpacity>
-              
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handleShare}
@@ -234,15 +161,15 @@ const DetailScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
-          
+
           <Text style={styles.title}>{apod.title}</Text>
-          
+
           {apod.copyright && (
             <Text style={styles.copyright}>© {apod.copyright}</Text>
           )}
-          
+
           <Text style={styles.explanation}>{apod.explanation}</Text>
-          
+
           {apod.media_type === 'video' && (
             <TouchableOpacity
               style={styles.videoButton}
@@ -252,20 +179,18 @@ const DetailScreen = ({ route, navigation }) => {
               <Text style={styles.videoButtonText}>Assistir ao vídeo</Text>
             </TouchableOpacity>
           )}
-          
+
           <View style={styles.infoContainer}>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Data:</Text>
               <Text style={styles.infoValue}>{formatDate(apod.date)}</Text>
             </View>
-            
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Tipo de mídia:</Text>
               <Text style={styles.infoValue}>
                 {apod.media_type === 'image' ? 'Imagem' : 'Vídeo'}
               </Text>
             </View>
-            
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Fonte:</Text>
               <Text style={styles.infoValue}>NASA APOD</Text>
@@ -273,28 +198,20 @@ const DetailScreen = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  scrollContent: {
-    // Completamente removido - deixar vazio para teste
-  },
   imageContainer: {
     width: width,
-    height: width * 0.6, // Altura menor para dar mais espaço ao texto
-    position: 'relative',
+    height: height * 0.4,
     backgroundColor: COLORS.primary,
   },
   imageWrapper: {
@@ -353,9 +270,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+ scrollContent: {
+  padding: 16,
+  paddingBottom: 40,
+},
+contentContainer: {
+  flex: 1,
+},
   contentContainer: {
-    padding: 16,
-    // REMOVIDO flex: 1 para permitir expansão natural
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -395,9 +318,9 @@ const styles = StyleSheet.create({
   explanation: {
     fontSize: 16,
     color: COLORS.text,
-    lineHeight: 26, // Melhor espaçamento para leitura
+    lineHeight: 26,
     marginBottom: 30,
-    textAlign: 'justify', // Justificar texto para melhor aparência
+    textAlign: 'justify',
   },
   videoButton: {
     flexDirection: 'row',
@@ -419,7 +342,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20, // Espaço final para o scroll
+    marginBottom: 20,
   },
   infoItem: {
     flexDirection: 'row',
