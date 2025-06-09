@@ -1,4 +1,3 @@
-// src/screens/LoginScreen.js - Versão final integrada com backend
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -19,16 +18,12 @@ import { makeRedirectUri } from 'expo-auth-session';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Importar contexto do usuário
 import { useUser } from '../contexts/UserContext';
 
-// Importar serviços
 import { authenticateWithGoogle, testApiConnection } from '../services/api';
 
-// Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
 
-// Garantir que as sessões de autenticação sejam concluídas corretamente
 WebBrowser.maybeCompleteAuthSession();
 
 const screenDimensions = Dimensions.get('window');
@@ -37,9 +32,8 @@ const LoginScreen = ({ navigation }) => {
   const { login } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [apiStatus, setApiStatus] = useState('checking'); // 'checking', 'connected', 'error'
+  const [apiStatus, setApiStatus] = useState('checking');
 
-  // Configurar solicitação de autenticação do Google
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: '22332176985-o1m31q76l9psr0o4gep64msps583lnhj.apps.googleusercontent.com',
     redirectUri: makeRedirectUri({
@@ -47,12 +41,10 @@ const LoginScreen = ({ navigation }) => {
     }),
   });
 
-  // Testar conexão com API ao carregar a tela
   useEffect(() => {
     checkApiConnection();
   }, []);
 
-  // Tratar resposta da autenticação
   useEffect(() => {
     console.log('📱 Resposta da autenticação Google:', response?.type);
 
@@ -66,7 +58,6 @@ const LoginScreen = ({ navigation }) => {
     }
   }, [response]);
 
-  // Verificar conexão com a API
   const checkApiConnection = async () => {
     try {
       console.log('🔍 Verificando conexão com API...');
@@ -89,25 +80,20 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
-  // Autenticar com Google através do backend
   const handleGoogleAuth = async (googleToken) => {
     try {
       console.log('🔑 Autenticando com backend Flask...');
       
-      // Verificar se API está disponível
       if (apiStatus !== 'connected') {
         throw new Error('API não está disponível. Verifique a conexão.');
       }
       
-      // Enviar token do Google para o backend Flask
       const authResult = await authenticateWithGoogle(googleToken);
       
       console.log('✅ Autenticação bem-sucedida:', authResult.user);
       
-      // Fazer login no contexto local
       await login(authResult.token, authResult.user);
       
-      // Mostrar feedback de sucesso
       Alert.alert(
         'Login realizado!',
         `Bem-vindo, ${authResult.user.name}!`,
@@ -145,7 +131,6 @@ const LoginScreen = ({ navigation }) => {
   const handleLoginPress = async () => {
     setError(null);
     
-    // Verificar conexão com API antes de tentar login
     if (apiStatus === 'error') {
       Alert.alert(
         'Sem conexão',
@@ -168,7 +153,10 @@ const LoginScreen = ({ navigation }) => {
     }
   }
 
-  // Renderizar indicador de status da API
+  const handleAboutPress = () => {
+    navigation.navigate('About');
+  };
+
   const renderApiStatus = () => {
     let statusColor, statusIcon, statusText;
     
@@ -208,6 +196,15 @@ const LoginScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      
+      {/* Botão Sobre no canto superior direito */}
+      <TouchableOpacity 
+        style={styles.aboutButton} 
+        onPress={handleAboutPress}
+      >
+        <Ionicons name="information-circle-outline" size={24} color={COLORS.text} />
+      </TouchableOpacity>
+
       <ImageBackground
         source={require('../../public/images/image.jpg')}
         style={styles.backgroundImage}
@@ -218,7 +215,7 @@ const LoginScreen = ({ navigation }) => {
           style={styles.overlay}
         >
           <View style={styles.logoContainer}>
-            <Text style={styles.appTitle}>APOD Explorer</Text>
+            <Text style={styles.appTitle}>SpaceXP</Text>
             <Text style={styles.subtitle}>
               Descubra a imagem astronômica do dia da NASA
             </Text>
@@ -295,6 +292,15 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  aboutButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 20,
+    padding: 8,
   },
   backgroundImage: {
     flex: 1,
@@ -428,6 +434,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
 
 export default LoginScreen;

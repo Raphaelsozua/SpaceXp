@@ -1,4 +1,3 @@
-// src/components/LoadingComponent.js
 import React from 'react';
 import {
   View,
@@ -7,7 +6,6 @@ import {
   StyleSheet,
 } from 'react-native';
 
-// Importar constantes
 import { COLORS } from '../config/constants';
 
 const LoadingComponent = ({ message = 'Carregando...' }) => {

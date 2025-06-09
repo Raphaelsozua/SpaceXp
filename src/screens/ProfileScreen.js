@@ -11,13 +11,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Importar contexto do usuário
 import { useUser } from '../contexts/UserContext';
 
-// Importar função para buscar favoritos
-import { getFavorites } from '../services/api'; // Ajuste o caminho conforme sua estrutura
+import { getFavorites } from '../services/api';
 
-// Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
 
 const ProfileScreen = () => {
@@ -33,7 +30,6 @@ const ProfileScreen = () => {
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
 
-  // Carregar contador de favoritos ao iniciar
   useEffect(() => {
     loadFavoritesCount();
   }, []);
@@ -47,17 +43,14 @@ const ProfileScreen = () => {
       console.error('Erro ao carregar favoritos:', error);
       setFavoritesCount(0);
       
-      // Se o erro for de autenticação (401), pode ser que o token expirou
       if (error.response?.status === 401) {
         console.log('Token expirado, fazendo logout...');
-        // O contexto deve lidar com isso automaticamente
       }
     } finally {
       setLoadingFavorites(false);
     }
   };
 
-  // Realizar logout usando confirm nativo
   const handleLogout = () => {
     const confirmed = window.confirm('Tem certeza que deseja sair da sua conta?');
     
@@ -66,7 +59,6 @@ const ProfileScreen = () => {
     }
   };
 
-  // Função para executar o logout
   const performLogout = async () => {
     try {
       setLoading(true);
@@ -79,12 +71,10 @@ const ProfileScreen = () => {
     }
   };
 
-  // Função para atualizar a contagem (pode ser chamada quando voltar de outras telas)
   const refreshFavoritesCount = () => {
     loadFavoritesCount();
   };
 
-  // Use useFocusEffect se você quiser atualizar sempre que a tela ganhar foco
   // import { useFocusEffect } from '@react-navigation/native';
   // useFocusEffect(
   //   React.useCallback(() => {
@@ -96,7 +86,6 @@ const ProfileScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <ScrollView style={styles.container}>
-        {/* Cabeçalho do perfil */}
         <View style={styles.profileHeader}>
           <View style={styles.profileInfo}>
             {getProfilePicture() ? (
@@ -117,7 +106,6 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        {/* Estatística de Favoritos */}
         <View style={styles.statsContainer}>
           <TouchableOpacity 
             style={styles.statItem}
@@ -134,7 +122,6 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Informações do aplicativo */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sobre o App</Text>
           
@@ -173,7 +160,6 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        {/* Botão de logout */}
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleLogout}

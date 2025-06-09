@@ -1,4 +1,3 @@
-// src/screens/FavoritesScreen.js - Versão final integrada com backend
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,13 +14,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
-// Importar componentes
 import APODCard from '../components/APODCard';
 
-// Importar serviços do backend
 import { getFavorites, removeFromFavorites, testApiConnection } from '../services/api';
 
-// Importar constantes
 import { COLORS } from '../config/constants';
 
 const FavoritesScreen = () => {
@@ -31,14 +27,47 @@ const FavoritesScreen = () => {
   const [error, setError] = useState(null);
   const [apiConnected, setApiConnected] = useState(true);
 
-  // Carregar favoritos quando a tela receber foco
+  const normalizeDate = (date) => {
+    if (!date) return '';
+    if (typeof date !== 'string') return String(date);
+    
+    try {
+      if (date.includes('GMT')) {
+        const dateObj = new Date(date);
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toISOString().split('T')[0];
+        }
+      }
+      
+      if (date.includes('T')) {
+        const dateObj = new Date(date);
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toISOString().split('T')[0];
+        }
+      }
+      
+      if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return date;
+      }
+      
+      const dateObj = new Date(date);
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toISOString().split('T')[0];
+      }
+      
+      return date;
+    } catch (error) {
+      console.error('Erro ao normalizar data:', error);
+      return date;
+    }
+  };
+
   useFocusEffect(
     React.useCallback(() => {
       loadFavorites();
     }, [])
   );
 
-  // Verificar conexão com API
   const checkApiStatus = async () => {
     try {
       const result = await testApiConnection();
@@ -50,13 +79,11 @@ const FavoritesScreen = () => {
     }
   };
 
-  // Carregar favoritos do backend
   const loadFavorites = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Verificar conexão com API primeiro
       const isConnected = await checkApiStatus();
       if (!isConnected) {
         throw new Error('Servidor não está disponível.');
@@ -65,8 +92,15 @@ const FavoritesScreen = () => {
       console.log('💖 Carregando favoritos do backend...');
       const favoritesData = await getFavorites();
       
-      console.log(`✅ ${favoritesData.length} favorito(s) carregado(s)`);
-      setFavorites(Array.isArray(favoritesData) ? favoritesData : []);
+      const normalizedFavorites = Array.isArray(favoritesData) 
+        ? favoritesData.map(fav => ({
+            ...fav,
+            date: normalizeDate(fav.date)
+          }))
+        : [];
+      
+      console.log(`✅ ${normalizedFavorites.length} favorito(s) carregado(s)`);
+      setFavorites(normalizedFavorites);
       setApiConnected(true);
     } catch (err) {
       console.error('❌ Erro ao carregar favoritos:', err);
@@ -90,7 +124,6 @@ const FavoritesScreen = () => {
     }
   };
 
-  // Remover dos favoritos
   const removeFavorite = (apod) => {
     if (!apiConnected) {
       Alert.alert(
@@ -114,17 +147,16 @@ const FavoritesScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log(`💔 Removendo favorito: ${apod.title}`);
+              console.log(`💔 Removendo favorito: ${apod.title} - Data: ${apod.date}`);
               
-              await removeFromFavorites(apod.date);
+              const normalizedDate = normalizeDate(apod.date);
+              await removeFromFavorites(normalizedDate);
               
-              // Atualizar lista local
-              const newFavorites = favorites.filter(fav => fav.date !== apod.date);
+              const newFavorites = favorites.filter(fav => normalizeDate(fav.date) !== normalizedDate);
               setFavorites(newFavorites);
               
               console.log('✅ Favorito removido com sucesso');
               
-              // Feedback visual opcional
               if (newFavorites.length === 0) {
                 Alert.alert('Lista vazia', 'Você não tem mais favoritos salvos.');
               }
@@ -147,36 +179,86 @@ const FavoritesScreen = () => {
     );
   };
 
-  // Limpar todos os favoritos
   const clearAllFavorites = () => {
-    if (favorites.length === 0) return;
+    console.log('🔘 Botão limpar pressionado');
+    console.log('📊 Estado atual:', {
+      favoritesLength: favorites.length,
+      apiConnected: apiConnected,
+      loading: loading
+    });
 
+    if (favorites.length === 0) {
+      console.log('❌ Lista vazia, saindo...');
+      return;
+    }
+
+    if (!apiConnected) {
+      console.log('❌ API desconectada');
+      Alert.alert(
+        'Sem conexão',
+        'Não foi possível conectar com o servidor.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    console.log('✅ Mostrando dialog de confirmação');
     Alert.alert(
       'Limpar favoritos',
-      'Tem certeza que deseja remover todos os seus favoritos?',
+      `Tem certeza que deseja remover todos os ${favorites.length} favoritos?`,
       [
         {
           text: 'Cancelar',
           style: 'cancel',
+          onPress: () => console.log('❌ Usuário cancelou')
         },
         {
           text: 'Limpar tudo',
           style: 'destructive',
           onPress: async () => {
+            console.log('🗑️ Iniciando remoção de todos os favoritos...');
+            
             try {
-              console.log('🗑️ Removendo todos os favoritos...');
+              setLoading(true);
               
-              // Remover todos os favoritos do backend
-              const removePromises = favorites.map(fav => removeFromFavorites(fav.date));
-              await Promise.all(removePromises);
+              let successCount = 0;
+              let errorCount = 0;
               
-              setFavorites([]);
-              console.log('✅ Todos os favoritos removidos');
+              for (let i = 0; i < favorites.length; i++) {
+                const fav = favorites[i];
+                try {
+                  const normalizedDate = normalizeDate(fav.date);
+                  console.log(`[${i+1}/${favorites.length}] Removendo: ${fav.title} - Data: ${normalizedDate}`);
+                  
+                  await removeFromFavorites(normalizedDate);
+                  successCount++;
+                  console.log(`✅ [${i+1}/${favorites.length}] Removido com sucesso`);
+                } catch (error) {
+                  errorCount++;
+                  console.error(`❌ [${i+1}/${favorites.length}] Erro ao remover:`, error);
+                }
+              }
               
-              Alert.alert('Concluído', 'Todos os favoritos foram removidos.');
+              console.log(`📊 Resultado final: ${successCount} sucessos, ${errorCount} erros`);
+              
+              if (errorCount === 0) {
+                setFavorites([]);
+                Alert.alert('Sucesso!', 'Todos os favoritos foram removidos.');
+              } else if (successCount > 0) {
+                Alert.alert(
+                  'Parcialmente concluído',
+                  `${successCount} favoritos removidos, ${errorCount} falharam. Recarregando lista...`
+                );
+                await loadFavorites();
+              } else {
+                throw new Error('Nenhum favorito pôde ser removido.');
+              }
+              
             } catch (err) {
-              console.error('❌ Erro ao limpar favoritos:', err);
-              Alert.alert('Erro', 'Não foi possível limpar todos os favoritos.');
+              console.error('❌ Erro geral:', err);
+              Alert.alert('Erro', err.message || 'Não foi possível limpar os favoritos.');
+            } finally {
+              setLoading(false);
             }
           },
         },
@@ -184,19 +266,16 @@ const FavoritesScreen = () => {
     );
   };
 
-  // Recarregar favoritos ao puxar para baixo
   const handleRefresh = () => {
     setRefreshing(true);
     loadFavorites();
   };
 
-  // Tentar reconectar
   const handleRetry = () => {
     setError(null);
     loadFavorites();
   };
 
-  // Renderizar item da lista
   const renderItem = ({ item }) => (
     <APODCard
       item={item}
@@ -205,7 +284,6 @@ const FavoritesScreen = () => {
     />
   );
 
-  // Renderizar cabeçalho da lista
   const renderListHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
@@ -219,19 +297,9 @@ const FavoritesScreen = () => {
           </View>
         )}
       </View>
-      {favorites.length > 0 && apiConnected && (
-        <TouchableOpacity
-          style={styles.clearButton}
-          onPress={clearAllFavorites}
-        >
-          <Ionicons name="trash-outline" size={20} color={COLORS.notification} />
-          <Text style={styles.clearButtonText}>Limpar</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 
-  // Renderizar conteúdo vazio
   const renderEmptyContent = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="heart-outline" size={80} color={COLORS.textSecondary} />
@@ -242,7 +310,6 @@ const FavoritesScreen = () => {
       <TouchableOpacity 
         style={styles.exploreButton}
         onPress={() => {
-          // A navegação será feita automaticamente pelas tabs
         }}
       >
         <Ionicons name="planet-outline" size={20} color={COLORS.text} style={{ marginRight: 8 }} />
@@ -251,7 +318,6 @@ const FavoritesScreen = () => {
     </View>
   );
 
-  // Renderizar estado de carregamento
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -263,7 +329,6 @@ const FavoritesScreen = () => {
     );
   }
 
-  // Renderizar estado de erro
   if (error && !refreshing && favorites.length === 0) {
     return (
       <SafeAreaView style={styles.errorContainer}>
@@ -299,7 +364,7 @@ const FavoritesScreen = () => {
       <FlatList
         data={favorites}
         renderItem={renderItem}
-        keyExtractor={(item) => item.date}
+        keyExtractor={(item) => normalizeDate(item.date)}
         contentContainerStyle={[
           styles.listContent,
           favorites.length === 0 && styles.emptyListContent,

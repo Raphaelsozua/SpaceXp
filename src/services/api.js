@@ -1,16 +1,10 @@
-// src/services/api.js - Atualizado para usar backend Flask
 import axios from 'axios';
 
-// URL base da API Flask
-// IMPORTANTE: Para testar no dispositivo físico, substitua localhost pelo IP da sua máquina
-const BASE_URL = __DEV__ ? 'http://localhost:5000/api' : 'http://localhost:5000/api';
 
-// Para dispositivo físico, descomente e use seu IP local:
-// const BASE_URL = 'http://192.168.1.XXX:5000/api';
+const BASE_URL = __DEV__ ? 'http://localhost:5000/api' : 'http://localhost:5000/api';
 
 console.log('🔗 API Base URL:', BASE_URL);
 
-// Cliente Axios configurado
 const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
@@ -19,10 +13,8 @@ const apiClient = axios.create({
   },
 });
 
-// Interceptor para adicionar token automaticamente
 apiClient.interceptors.request.use(
   (config) => {
-    // Para web, usar localStorage temporariamente
     const token = localStorage.getItem('user_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -40,7 +32,6 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Interceptor para tratamento de respostas
 apiClient.interceptors.response.use(
   (response) => {
     console.log(`✅ ${response.status} ${response.config.url}`);
@@ -55,19 +46,15 @@ apiClient.interceptors.response.use(
       data: error.response?.data
     });
     
-    // Tratamento específico para diferentes códigos de erro
     if (status === 401) {
-      // Token inválido ou expirado - limpar dados de autenticação
       localStorage.removeItem('user_token');
       localStorage.removeItem('user_info');
-      // Não redirecionar aqui, deixar o contexto lidar com isso
     }
     
     return Promise.reject(error);
   }
 );
 
-// ===================== AUTENTICAÇÃO =====================
 
 export const authenticateWithGoogle = async (googleToken) => {
   try {
@@ -85,7 +72,6 @@ export const authenticateWithGoogle = async (googleToken) => {
   }
 };
 
-// ===================== USUÁRIO =====================
 
 export const getUserProfile = async () => {
   try {
@@ -107,7 +93,6 @@ export const updateUserSettings = async (settings) => {
   }
 };
 
-// ===================== APOD =====================
 
 export const getAPOD = async (date = null) => {
   try {
@@ -126,7 +111,6 @@ export const getRandomAPODs = async (count = 5) => {
       params: { count: Math.min(count, 10) }
     });
     
-    // Garantir que sempre retorna um array
     const data = response.data;
     return Array.isArray(data) ? data : [data];
   } catch (error) {
@@ -135,7 +119,6 @@ export const getRandomAPODs = async (count = 5) => {
   }
 };
 
-// ===================== FAVORITOS =====================
 
 export const getFavorites = async () => {
   try {
@@ -143,9 +126,8 @@ export const getFavorites = async () => {
     return response.data || [];
   } catch (error) {
     console.error('❌ Erro ao buscar favoritos:', error);
-    // Retornar array vazio em caso de erro para não quebrar a UI
     if (error.response?.status === 401) {
-      throw error; // Re-throw para que o contexto possa lidar com logout
+      throw error;
     }
     return [];
   }
@@ -188,12 +170,10 @@ export const checkIsFavorite = async (date) => {
     return response.data.is_favorite;
   } catch (error) {
     console.error('❌ Erro ao verificar favorito:', error);
-    // Retornar false em caso de erro
     return false;
   }
 };
 
-// ===================== ESTATÍSTICAS =====================
 
 export const getPopularAPODs = async () => {
   try {
@@ -205,11 +185,9 @@ export const getPopularAPODs = async () => {
   }
 };
 
-// ===================== UTILIDADES =====================
 
 export const testApiConnection = async () => {
   try {
-    // Testar endpoint básico (sem autenticação)
     const response = await axios.get(BASE_URL.replace('/api', '/health'), {
       timeout: 5000
     });
@@ -228,7 +206,6 @@ export const testApiConnection = async () => {
   }
 };
 
-// Export default com todas as funções
 export default {
   authenticateWithGoogle,
   getUserProfile,

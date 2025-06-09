@@ -1,4 +1,3 @@
-// src/components/FavoriteButton.js (Corrigido)
 import React from 'react';
 import {
   TouchableOpacity,
@@ -7,15 +6,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Importar constantes
 import { COLORS } from '../config/constants';
 
-// Versão com função componente (hooks) em vez de classe
 const FavoriteButton = ({ isFavorite, onPress, style }) => {
   const animatedScale = React.useRef(new Animated.Value(1)).current;
 
   const animateButton = () => {
-    // Sequência de animação para o efeito de pulsar
     Animated.sequence([
       Animated.timing(animatedScale, {
         toValue: 1.3,
@@ -35,7 +31,6 @@ const FavoriteButton = ({ isFavorite, onPress, style }) => {
     onPress();
   };
 
-  // Transformação para o efeito de escala
   const animatedStyle = {
     transform: [{ scale: animatedScale }],
   };

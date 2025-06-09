@@ -126,25 +126,21 @@ const HomeScreen = () => {
     }
   };
 
-  // Verificar se um item é favorito
   const isFavorite = (item) => {
     return favoritesStatus[item.date] || false;
   };
 
-  // Recarregar dados ao puxar para baixo
   const handleRefresh = () => {
     setRefreshing(true);
     loadData();
   };
 
-  // Alternar entre os modos de visualização
   const toggleViewMode = () => {
     const newMode = viewMode === 'today' ? 'random' : 'today';
     setViewMode(newMode);
     setData([]);
   };
 
-  // Renderizar item da lista
   const renderItem = ({ item }) => (
     <APODCard
       item={item}
@@ -153,7 +149,6 @@ const HomeScreen = () => {
     />
   );
 
-  // Renderizar cabeçalho da lista
   const renderListHeader = () => (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>
@@ -172,7 +167,6 @@ const HomeScreen = () => {
     </View>
   );
 
-  // Renderizar estado de carregamento
   if (loading && !refreshing && data.length === 0) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -184,7 +178,6 @@ const HomeScreen = () => {
     );
   }
 
-  // Renderizar mensagem de erro
   if (error && !refreshing && data.length === 0) {
     return (
       <SafeAreaView style={styles.errorContainer}>

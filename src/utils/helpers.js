@@ -1,11 +1,8 @@
-// src/utils/helpers.js
 import { Dimensions, Platform } from 'react-native';
 
-// Obter dimensões da tela
 export const screenWidth = Dimensions.get('window').width;
 export const screenHeight = Dimensions.get('window').height;
 
-// Verificar se o dispositivo é um iPhone com notch
 export const isIphoneX = () => {
   const { width, height } = Dimensions.get('window');
   return (
@@ -20,7 +17,6 @@ export const isIphoneX = () => {
   );
 };
 
-// Formatar data no formato DD/MM/YYYY
 export const formatDate = (dateString) => {
   if (!dateString) return '';
   
@@ -33,7 +29,6 @@ export const formatDate = (dateString) => {
   }
 };
 
-// Truncar texto com número máximo de caracteres
 export const truncateText = (text, maxLength) => {
   if (!text) return '';
   if (text.length <= maxLength) return text;
@@ -41,7 +36,6 @@ export const truncateText = (text, maxLength) => {
   return text.substring(0, maxLength) + '...';
 };
 
-// Verificar se a URL é uma imagem
 export const isImageUrl = (url) => {
   if (!url) return false;
   
@@ -51,7 +45,6 @@ export const isImageUrl = (url) => {
   return imageExtensions.includes(extension);
 };
 
-// Verificar se a URL é um vídeo
 export const isVideoUrl = (url) => {
   if (!url) return false;
   
@@ -61,12 +54,10 @@ export const isVideoUrl = (url) => {
   return videoExtensions.includes(extension) || url.includes('youtube.com') || url.includes('vimeo.com');
 };
 
-// Gerar um ID único
 export const generateUniqueId = () => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
 
-// Pegar data atual no formato YYYY-MM-DD
 export const getCurrentDate = () => {
   const date = new Date();
   const year = date.getFullYear();
@@ -76,7 +67,6 @@ export const getCurrentDate = () => {
   return `${year}-${month}-${day}`;
 };
 
-// Obter data passada a partir de dias (hoje - dias)
 export const getDateMinusDays = (days) => {
   const date = new Date();
   date.setDate(date.getDate() - days);
@@ -88,7 +78,6 @@ export const getDateMinusDays = (days) => {
   return `${year}-${month}-${day}`;
 };
 
-// Calcular o tempo decorrido entre duas datas em dias
 export const getDaysBetweenDates = (startDate, endDate) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -98,7 +87,6 @@ export const getDaysBetweenDates = (startDate, endDate) => {
   return diffDays;
 };
 
-// Converter 'media_type' da API APOD para texto legível
 export const getMediaTypeLabel = (mediaType) => {
   switch (mediaType) {
     case 'image':
@@ -110,7 +98,6 @@ export const getMediaTypeLabel = (mediaType) => {
   }
 };
 
-// Formatar para mostar data relativa (hoje, ontem, etc.)
 export const getRelativeDate = (dateString) => {
   const today = new Date();
   const date = new Date(dateString);

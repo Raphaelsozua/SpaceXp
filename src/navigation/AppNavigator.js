@@ -6,24 +6,20 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, View } from 'react-native';
 
-// Importar contexto do usuário
 import { useUser } from '../contexts/UserContext';
 
-// Importar telas
 import HomeScreen from '../screens/HomeScreen';
 import DetailScreen from '../screens/DetailScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import LoginScreen from '../screens/LoginScreen';
+import AboutScreen from '../screens/AboutScreen';
 
-// Importar constantes de cores
 import { COLORS } from '../config/constants';
 
-// Criar navegadores
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Navegador principal com tabs
 const MainTabNavigator = () => {
   return (
     <Tab.Navigator
@@ -76,24 +72,20 @@ const MainTabNavigator = () => {
   );
 };
 
-// Navegador principal do aplicativo
 const AppNavigator = () => {
   const { isAuthenticated, isLoading, userToken } = useUser();
 
-  // Debug logs
   console.log('🔍 AppNavigator Debug:', {
     isAuthenticated,
     isLoading,
     hasToken: !!userToken
   });
 
-  // Mostrar loading enquanto carrega dados do usuário
   if (isLoading) {
     return (
+      
       <View style={{ 
         flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
         backgroundColor: COLORS.background 
       }}>
         <ActivityIndicator size="large" color={COLORS.accent} />
@@ -112,10 +104,9 @@ const AppNavigator = () => {
           headerTitleStyle: {
             fontWeight: 'bold',
           },
-          cardStyle: { backgroundColor: COLORS.background }
+          cardStyle: { backgroundColor: COLORS.background, flex: 1  }
         }}
       >
-        {/* Verificar tanto isAuthenticated quanto userToken para garantir */}
         {(isAuthenticated && userToken) ? (
           <>
             <Stack.Screen 
@@ -136,6 +127,11 @@ const AppNavigator = () => {
             options={{ headerShown: false }}
           />
         )}
+        <Stack.Screen 
+          name="About" 
+          component={AboutScreen} 
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

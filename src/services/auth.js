@@ -5,14 +5,11 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { AUTH_CONFIG } from '../config/constants';
 
-// Registra o WebBrowser para manipular redirecionamentos de autenticação
 WebBrowser.maybeCompleteAuthSession();
 
-// Chaves para armazenamento seguro
 const AUTH_TOKEN_KEY = 'auth_token';
 const USER_INFO_KEY = 'user_info';
 
-// Solicitar o login utilizando OAuth
 export const login = async () => {
   try {
     const redirectUri = AuthSession.makeRedirectUri({
@@ -20,7 +17,6 @@ export const login = async () => {
       path: 'callback',
     });
 
-    // Criar solicitação de autenticação
     const request = new AuthSession.AuthRequest({
       clientId: AUTH_CONFIG.clientId,
       redirectUri,
@@ -28,23 +24,18 @@ export const login = async () => {
       scopes: AUTH_CONFIG.scopes,
     });
 
-    // Iniciar o fluxo de autenticação
     const result = await request.promptAsync({
       authorizationEndpoint: AUTH_CONFIG.authorizationEndpoint,
       useProxy: Platform.select({ web: true, default: true }),
     });
 
     if (result.type === 'success') {
-      // Extrair o token de acesso da resposta
       const { access_token } = result.params;
       
-      // Armazenar o token de forma segura
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, access_token);
       
-      // Buscar informações do usuário
       const userInfo = await fetchUserInfo(access_token);
       
-      // Armazenar informações do usuário
       await SecureStore.setItemAsync(USER_INFO_KEY, JSON.stringify(userInfo));
       
       return { success: true, token: access_token, userInfo };
@@ -57,10 +48,8 @@ export const login = async () => {
   }
 };
 
-// Buscar informações do usuário usando o token
 const fetchUserInfo = async (token) => {
   try {
-    // Exemplo para Google OAuth
     const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -77,7 +66,6 @@ const fetchUserInfo = async (token) => {
   }
 };
 
-// Verificar se o usuário está autenticado
 export const isAuthenticated = async () => {
   try {
     const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -88,7 +76,6 @@ export const isAuthenticated = async () => {
   }
 };
 
-// Obter informações do usuário armazenadas
 export const getUserInfo = async () => {
   try {
     const userInfoString = await SecureStore.getItemAsync(USER_INFO_KEY);
@@ -99,7 +86,6 @@ export const getUserInfo = async () => {
   }
 };
 
-// Obter o token de autenticação
 export const getAuthToken = async () => {
   try {
     return await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -109,7 +95,6 @@ export const getAuthToken = async () => {
   }
 };
 
-// Fazer logout (remover dados de autenticação)
 export const logout = async () => {
   try {
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);

@@ -11,28 +11,55 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-// Importar constantes
 import { COLORS, COMMON_STYLES } from '../config/constants';
 
-// Componente para exibir uma APOD em formato de card
 const APODCard = ({ item, onAddFavorite, isFavorite = false }) => {
   const navigation = useNavigation();
   const [imageLoading, setImageLoading] = useState(true);
 
-  // Determinar qual URL da imagem usar
   const imageUrl = item.media_type === 'image' 
     ? item.url 
-    : (item.thumbnail_url || 'https://via.placeholder.com/400x300/121212/6366F1?text=Video');
+    : item.thumbnail_url;
 
-  // Manipular o clique no card para ir para a tela de detalhes
   const handlePress = () => {
     navigation.navigate('Detail', { apod: item });
   };
 
-  // Formatar a data para exibição (YYYY-MM-DD para DD/MM/YYYY)
   const formatDate = (dateString) => {
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
+    try {
+      if (!dateString) return 'Data não disponível';
+      
+      if (dateString.includes('GMT') || dateString.includes('T')) {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+          return 'Data inválida';
+        }
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+      
+      if (dateString.includes('-') && dateString.split('-').length === 3) {
+        const [year, month, day] = dateString.split('-');
+        if (year && month && day && year.length === 4) {
+          return `${day}/${month}/${year}`;
+        }
+      }
+      
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+      
+      return 'Data inválida';
+    } catch (error) {
+      console.error('Erro ao formatar data no APODCard:', error, 'Data recebida:', dateString);
+      return 'Data inválida';
+    }
   };
 
   return (
