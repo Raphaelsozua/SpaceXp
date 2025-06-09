@@ -89,7 +89,6 @@ const FavoritesScreen = () => {
         throw new Error('Servidor não está disponível.');
       }
 
-      console.log('💖 Carregando favoritos do backend...');
       const favoritesData = await getFavorites();
       
       const normalizedFavorites = Array.isArray(favoritesData) 
@@ -99,7 +98,6 @@ const FavoritesScreen = () => {
           }))
         : [];
       
-      console.log(`✅ ${normalizedFavorites.length} favorito(s) carregado(s)`);
       setFavorites(normalizedFavorites);
       setApiConnected(true);
     } catch (err) {
@@ -147,7 +145,6 @@ const FavoritesScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log(`💔 Removendo favorito: ${apod.title} - Data: ${apod.date}`);
               
               const normalizedDate = normalizeDate(apod.date);
               await removeFromFavorites(normalizedDate);
@@ -155,7 +152,6 @@ const FavoritesScreen = () => {
               const newFavorites = favorites.filter(fav => normalizeDate(fav.date) !== normalizedDate);
               setFavorites(newFavorites);
               
-              console.log('✅ Favorito removido com sucesso');
               
               if (newFavorites.length === 0) {
                 Alert.alert('Lista vazia', 'Você não tem mais favoritos salvos.');
@@ -180,20 +176,14 @@ const FavoritesScreen = () => {
   };
 
   const clearAllFavorites = () => {
-    console.log('🔘 Botão limpar pressionado');
-    console.log('📊 Estado atual:', {
-      favoritesLength: favorites.length,
-      apiConnected: apiConnected,
-      loading: loading
-    });
+
 
     if (favorites.length === 0) {
-      console.log('❌ Lista vazia, saindo...');
       return;
     }
 
     if (!apiConnected) {
-      console.log('❌ API desconectada');
+      console.log('API desconectada');
       Alert.alert(
         'Sem conexão',
         'Não foi possível conectar com o servidor.',
@@ -202,7 +192,6 @@ const FavoritesScreen = () => {
       return;
     }
 
-    console.log('✅ Mostrando dialog de confirmação');
     Alert.alert(
       'Limpar favoritos',
       `Tem certeza que deseja remover todos os ${favorites.length} favoritos?`,
@@ -210,13 +199,12 @@ const FavoritesScreen = () => {
         {
           text: 'Cancelar',
           style: 'cancel',
-          onPress: () => console.log('❌ Usuário cancelou')
+          onPress: () => console.log('Usuário cancelou')
         },
         {
           text: 'Limpar tudo',
           style: 'destructive',
           onPress: async () => {
-            console.log('🗑️ Iniciando remoção de todos os favoritos...');
             
             try {
               setLoading(true);
@@ -232,14 +220,13 @@ const FavoritesScreen = () => {
                   
                   await removeFromFavorites(normalizedDate);
                   successCount++;
-                  console.log(`✅ [${i+1}/${favorites.length}] Removido com sucesso`);
+                  console.log(`[${i+1}/${favorites.length}] Removido com sucesso`);
                 } catch (error) {
                   errorCount++;
                   console.error(`❌ [${i+1}/${favorites.length}] Erro ao remover:`, error);
                 }
               }
               
-              console.log(`📊 Resultado final: ${successCount} sucessos, ${errorCount} erros`);
               
               if (errorCount === 0) {
                 setFavorites([]);

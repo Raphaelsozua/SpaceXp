@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const BASE_URL = __DEV__ ? 'http://localhost:5000/api' : 'http://localhost:5000/api';
 
-console.log('🔗 API Base URL:', BASE_URL);
+console.log('API Base URL:', BASE_URL);
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -20,9 +20,6 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    console.log(`📡 ${config.method?.toUpperCase()} ${config.url}`, {
-      headers: config.headers.Authorization ? '✅ Com token' : '❌ Sem token'
-    });
     
     return config;
   },
@@ -34,7 +31,6 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => {
-    console.log(`✅ ${response.status} ${response.config.url}`);
     return response;
   },
   (error) => {
@@ -58,13 +54,11 @@ apiClient.interceptors.response.use(
 
 export const authenticateWithGoogle = async (googleToken) => {
   try {
-    console.log('🔐 Iniciando autenticação com Google...');
     
     const response = await apiClient.post('/auth/google', {
       token: googleToken
     });
     
-    console.log('✅ Autenticação bem-sucedida:', response.data.user);
     return response.data;
   } catch (error) {
     console.error('❌ Erro na autenticação:', error.response?.data || error.message);
@@ -135,14 +129,12 @@ export const getFavorites = async () => {
 
 export const addToFavorites = async (apodData) => {
   try {
-    console.log('❤️ Adicionando aos favoritos:', apodData.title);
     
     const response = await apiClient.post('/favorites', {
       date: apodData.date,
       apod: apodData
     });
     
-    console.log('✅ Favorito adicionado:', response.data.message);
     return response.data;
   } catch (error) {
     console.error('❌ Erro ao adicionar favorito:', error);
@@ -152,11 +144,9 @@ export const addToFavorites = async (apodData) => {
 
 export const removeFromFavorites = async (date) => {
   try {
-    console.log('💔 Removendo dos favoritos:', date);
     
     const response = await apiClient.delete(`/favorites/${date}`);
     
-    console.log('✅ Favorito removido:', response.data.message);
     return response.data;
   } catch (error) {
     console.error('❌ Erro ao remover favorito:', error);
@@ -192,7 +182,6 @@ export const testApiConnection = async () => {
       timeout: 5000
     });
     
-    console.log('🎯 Teste de conexão:', response.data);
     return {
       success: true,
       data: response.data

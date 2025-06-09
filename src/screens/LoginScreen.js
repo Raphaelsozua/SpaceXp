@@ -46,7 +46,6 @@ const LoginScreen = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    console.log('📱 Resposta da autenticação Google:', response?.type);
 
     if (response?.type === 'success') {
       setLoading(true);
@@ -60,16 +59,13 @@ const LoginScreen = ({ navigation }) => {
 
   const checkApiConnection = async () => {
     try {
-      console.log('🔍 Verificando conexão com API...');
       setApiStatus('checking');
       
       const result = await testApiConnection();
       
       if (result.success) {
-        console.log('✅ API conectada:', result.data.status);
         setApiStatus('connected');
       } else {
-        console.log('❌ API desconectada:', result.error);
         setApiStatus('error');
         setError('Não foi possível conectar com o servidor. Verifique se o Flask está rodando.');
       }
@@ -82,7 +78,6 @@ const LoginScreen = ({ navigation }) => {
 
   const handleGoogleAuth = async (googleToken) => {
     try {
-      console.log('🔑 Autenticando com backend Flask...');
       
       if (apiStatus !== 'connected') {
         throw new Error('API não está disponível. Verifique a conexão.');
@@ -90,7 +85,6 @@ const LoginScreen = ({ navigation }) => {
       
       const authResult = await authenticateWithGoogle(googleToken);
       
-      console.log('✅ Autenticação bem-sucedida:', authResult.user);
       
       await login(authResult.token, authResult.user);
       
@@ -144,9 +138,7 @@ const LoginScreen = ({ navigation }) => {
     }
     
     try {
-      console.log('🚀 Iniciando autenticação Google...');
       const result = await promptAsync();
-      console.log('📱 Resultado do Google OAuth:', result.type);
     } catch (e) {
       console.error('❌ Erro ao iniciar autenticação:', e);
       setError('Erro ao iniciar autenticação');

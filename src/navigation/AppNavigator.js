@@ -75,12 +75,6 @@ const MainTabNavigator = () => {
 const AppNavigator = () => {
   const { isAuthenticated, isLoading, userToken } = useUser();
 
-  console.log('🔍 AppNavigator Debug:', {
-    isAuthenticated,
-    isLoading,
-    hasToken: !!userToken
-  });
-
   if (isLoading) {
     return (
       

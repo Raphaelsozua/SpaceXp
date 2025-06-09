@@ -26,11 +26,7 @@ export const UserProvider = ({ children }) => {
 
   useEffect(() => {
     const newAuthState = !!userToken;
-    console.log('🔄 Token mudou:', {
-      hasToken: !!userToken,
-      wasAuthenticated: isAuthenticated,
-      willBeAuthenticated: newAuthState
-    });
+    
     setIsAuthenticated(newAuthState);
   }, [userToken]);
 
@@ -63,7 +59,6 @@ export const UserProvider = ({ children }) => {
   const login = async (token, userData) => {
     try {
       setIsLoading(true);
-      console.log('🔑 Iniciando login...', { hasToken: !!token, hasUserData: !!userData });
       
       localStorage.setItem(USER_TOKEN_KEY, token);
       setUserToken(token);
@@ -74,7 +69,6 @@ export const UserProvider = ({ children }) => {
       }
       
       setIsAuthenticated(true);
-      console.log('✅ Login realizado com sucesso');
     } catch (error) {
       console.error('❌ Erro ao fazer login:', error);
       throw error;
@@ -85,39 +79,23 @@ export const UserProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      console.log('🚪 Iniciando logout...');
-      console.log('📊 Estado antes do logout:', {
-        hasToken: !!userToken,
-        hasUserInfo: !!userInfo,
-        isAuthenticated
-      });
       
       setIsLoading(true);
       
       localStorage.removeItem(USER_TOKEN_KEY);
       localStorage.removeItem(USER_INFO_KEY);
-      console.log('🗑️ Dados removidos do localStorage');
       
       setUserToken(null);
       setUserInfo(null);
       setIsAuthenticated(false);
       
-      console.log('📊 Estado após o logout:', {
-        hasToken: false,
-        hasUserInfo: false,
-        isAuthenticated: false
-      });
+
       
       const checkToken = localStorage.getItem(USER_TOKEN_KEY);
       const checkUserInfo = localStorage.getItem(USER_INFO_KEY);
-      console.log('🔍 Verificação localStorage:', {
-        tokenLimpo: checkToken === null,
-        userInfoLimpo: checkUserInfo === null
-      });
+
       
-      console.log('✅ Logout realizado com sucesso');
     } catch (error) {
-      console.error('❌ Erro ao fazer logout:', error);
       throw error;
     } finally {
       setIsLoading(false);
